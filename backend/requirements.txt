@@ -1,0 +1,108 @@
+# =============================================================================
+# SSTG — Complete Python Dependencies (production + dev in one file)
+# Compatible with Python 3.9 → 3.14
+#
+# Install all:         pip install -r requirements.txt
+# Install prod only:   pip install -r requirements.txt --no-deps -r /dev/null
+#                      (or comment out the [DEV] section below)
+#
+# Render deploy:       Set environment variable  PYTHON_VERSION=3.12
+#                      Build command: pip install -r requirements.txt
+# =============================================================================
+#
+# WHY THESE SPECIFIC PACKAGES (Python 3.13/3.14 migration notes)
+# ─────────────────────────────────────────────────────────────────
+# passlib      REMOVED — imports `cgi` module removed in Python 3.13. ImportError
+#              on startup. Replaced with: bcrypt>=4.2 (used directly).
+#
+# python-jose  REMOVED — last release 2021. CVE-2024-33663/33664. No 3.14 wheels.
+#              Replaced with: PyJWT>=2.10 (actively maintained, pure Python + C).
+#
+# psycopg2     REPLACED by psycopg[binary] (psycopg v3, official successor).
+#              psycopg2 binary wheels lag months on new CPython releases.
+#              psycopg3 publishes wheels same day as CPython. API is identical
+#              for basic use; connection strings are unchanged.
+#
+# datetime.utcnow() REMOVED throughout codebase — deprecated since Python 3.12,
+#              raises DeprecationWarning. Replaced with datetime.now(timezone.utc).
+# =============================================================================
+
+
+# ── [PROD] Web framework ──────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0          # [standard] = websockets + httptools + uvloop
+python-multipart>=0.0.12           # Required for OAuth2 form login
+
+# ── [PROD] Database ───────────────────────────────────────────────────────────
+sqlalchemy>=2.0.36
+alembic>=1.14.0
+psycopg[binary]>=3.2.0             # PostgreSQL driver (psycopg3). For SQLite dev,
+                                   # this is unused but kept for Render/prod parity.
+                                   # If wheel missing: pip install psycopg libpq-dev
+
+# ── [PROD] Data validation ────────────────────────────────────────────────────
+pydantic>=2.10.0                   # pydantic-core >=2.27 has Python 3.14 wheels
+pydantic-settings>=2.6.0
+
+# ── [PROD] Authentication ─────────────────────────────────────────────────────
+PyJWT>=2.10.0                      # JWT — replaces python-jose
+bcrypt>=4.2.1                      # Password hashing — replaces passlib
+cryptography>=43.0.0               # PyJWT RS256 support + psycopg SSL
+
+# ── [PROD] PDF generation ─────────────────────────────────────────────────────
+reportlab>=4.2.5                   # Has pure-Python fallback if C ext missing
+
+# ── [PROD] Environment & HTTP ─────────────────────────────────────────────────
+python-dotenv>=1.0.1
+httpx>=0.28.0                      # FastAPI TestClient transport (pure Python)
+websockets>=13.1                   # WS support for uvicorn (pure Python)
+
+# ── [PROD] Testing (also needed in CI/Render preview) ─────────────────────────
+pytest>=8.3.0
+pytest-cov>=6.0.0
+anyio[trio]>=4.7.0                 # Async test runner
+
+
+# =============================================================================
+# [DEV] Local development extras — safe to remove for a slim production build
+# =============================================================================
+
+# Code quality
+black>=24.4.2                      # Formatter
+isort>=5.13.2                      # Import sorter
+flake8>=7.0.0                      # Linter
+pre-commit>=3.7.1                  # Git hooks
+
+# Debugging
+ipython>=8.25.0                    # Better REPL
+rich>=13.7.1                       # Pretty print / tracebacks
+
+# Test extras
+pytest-asyncio>=0.23.7             # Async pytest support
+pytest-mock>=3.14.0                # Mocking helpers
+
+
+# =============================================================================
+# TROUBLESHOOTING RENDER / PYTHON 3.14 INSTALL ISSUES
+#
+# 1. No wheel for a package?
+#    pip install --upgrade <package>          # try latest first
+#    pip install --no-binary <package> <pkg>  # compile from source
+#
+# 2. uvloop (pulled by uvicorn[standard]) fails?
+#    Use:  uvicorn>=0.32.0  (without [standard])
+#          httptools>=0.6.1  (keeps HTTP/1.1 performance)
+#    The app runs correctly without uvloop.
+#
+# 3. psycopg[binary] fails on Render?
+#    Render uses Debian — libpq is available.
+#    Try:  psycopg>=3.2.0  (source build, needs libpq-dev in buildpack)
+#    Or:   keep SQLite for non-prod environments (DATABASE_URL=sqlite:///./sstg.db)
+#
+# 4. Render-specific: set these in Dashboard → Environment:
+#    PYTHON_VERSION = 3.12   (most stable wheel coverage today)
+#    DATABASE_URL   = postgresql+psycopg://...  (from Render Postgres add-on)
+#    SECRET_KEY     = <openssl rand -hex 32>
+# =============================================================================
+
+openpyxl>=3.1.2                    # Excel (.xlsx) export
