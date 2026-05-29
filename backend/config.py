@@ -35,6 +35,19 @@ class Settings(BaseSettings):
     PERIODS_PER_DAY: int = 8
     SCHOOL_DAYS: str = "Monday,Tuesday,Wednesday,Thursday,Friday"
 
+    # ── Free API integrations ──────────────────────────────────────────────────
+    # Google Gemini — free at https://aistudio.google.com/app/apikey
+    # Free tier: 15 req/min, 1 million tokens/day (no credit card needed)
+    GEMINI_API_KEY: str = ""
+
+    # SendGrid — free at https://sendgrid.com (100 emails/day)
+    # Better than raw SMTP — no port 587 issues on Render
+    SENDGRID_API_KEY: str = ""
+
+    # Country code for public holidays (ISO 3166-1 alpha-2)
+    # Used by Nager.Date API (no key needed — completely free)
+    HOLIDAY_COUNTRY: str = "ZA"  # ZA=South Africa, US, GB, KE, NG etc.
+
     # CORS — comma-separated list of allowed origins.
     # In Render, set this to your live frontend URL, e.g.:
     #   https://smartadmin-frontend.onrender.com

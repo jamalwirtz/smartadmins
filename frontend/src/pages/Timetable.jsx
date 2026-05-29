@@ -1,3 +1,4 @@
+import AIAssistant from '../components/AIAssistant'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -71,6 +72,7 @@ function TimetableCell({ slot, onLock, isDragging }) {
         {slot.is_locked ? <Lock size={9} color="var(--amber)" /> : <Unlock size={9} color="var(--muted)" />}
       </button>
     </motion.div>
+    <AIAssistant context="timetable" />
   )
 }
 

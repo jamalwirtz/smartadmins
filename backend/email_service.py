@@ -52,3 +52,53 @@ class EmailService:
             return True
         except smtplib.SMTPException as exc:
             raise HTTPException(500, detail=f"Email failed: {exc}")
+
+
+# ── SendGrid alternative (100 emails/day free) ────────────────────────────────
+def send_with_sendgrid(to_email: str, subject: str, html_content: str) -> bool:
+    """
+    Send email via SendGrid free tier (100 emails/day, no SMTP config needed).
+    Get API key at https://sendgrid.com → free account → Settings → API Keys
+    Set as environment variable: SENDGRID_API_KEY
+    """
+    from config import get_settings
+    cfg = get_settings()
+
+    if not cfg.SENDGRID_API_KEY:
+        return False
+
+    try:
+        import httpx
+        response = httpx.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {cfg.SENDGRID_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "personalizations": [{"to": [{"email": to_email}]}],
+                "from": {"email": cfg.EMAIL_FROM or "noreply@school.edu",
+                         "name": cfg.EMAIL_FROM_NAME},
+                "subject": subject,
+                "content": [{"type": "text/html", "value": html_content}],
+            },
+            timeout=15.0,
+        )
+        return response.status_code in (200, 202)
+    except Exception as e:
+        print(f"[SendGrid] Error: {e}")
+        return False
+
+
+def send_email_smart(to_email: str, subject: str, html_content: str) -> bool:
+    """
+    Try SendGrid first (more reliable on Render), fall back to SMTP.
+    """
+    if send_with_sendgrid(to_email, subject, html_content):
+        return True
+    # Fall back to SMTP
+    try:
+        send_email(to_email, subject, html_content)
+        return True
+    except Exception:
+        return False

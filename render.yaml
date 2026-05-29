@@ -1,69 +1,47 @@
-# =============================================================================
 # render.yaml — SINGLE SERVICE deployment
-# Both frontend (React) and backend (FastAPI) run from one Render web service.
-# No CORS issues. No VITE_API_URL needed. One bill.
-#
-# How it works:
-#   Build step  → builds React into frontend/dist/
-#   Start step  → FastAPI starts and serves both API + React static files
-#   Root route  → FastAPI catch-all serves index.html for React Router
-# =============================================================================
+# Frontend + Backend served from one Render web service.
+# No CORS. No VITE_API_URL. One bill.
 
 services:
   - type: web
     name: smartadmin
     runtime: python
-    rootDir: .                    # project root — NOT backend/
+    rootDir: .
 
-    # ── Build ─────────────────────────────────────────────────────────────────
-    # Step 1: build the React frontend into frontend/dist/
-    # Step 2: install Python dependencies
-    buildCommand: >
-      cd frontend && npm install && npm run build && cd .. &&
-      pip install -r backend/requirements.txt
+    # Build: React first, then Python deps — both from project root
+    buildCommand: "npm --prefix frontend install && npm --prefix frontend run build && pip install -r requirements.txt"
 
-    # ── Start ─────────────────────────────────────────────────────────────────
-    # Runs from project root — root main.py loads backend/main.py via importlib
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
 
-    # ── Health check ──────────────────────────────────────────────────────────
     healthCheckPath: /health
 
-    # ── Environment variables ─────────────────────────────────────────────────
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
-
+      - key: NODE_VERSION
+        value: "20"
       - key: SECRET_KEY
-        generateValue: true       # Render auto-generates a secure value
-
+        generateValue: true
       - key: DATABASE_URL
         fromDatabase:
           name: sstg-db
           property: connectionString
-
       - key: SCHOOL_NAME
         value: "Greenfield Academy"
-
       - key: ACADEMIC_YEAR
         value: "2025/2026"
-
-      # CORS — allow same origin (no separate frontend service)
       - key: CORS_ORIGINS
         value: "*"
-
-      # Optional email settings — set in Render dashboard if needed
-      # - key: SMTP_HOST
-      #   value: smtp.gmail.com
-      # - key: SMTP_USER
-      #   value: your@gmail.com
-      # - key: SMTP_PASSWORD
+      # Set GEMINI_API_KEY in Render dashboard after getting from Google AI Studio
+      # - key: GEMINI_API_KEY
+      #   sync: false
+      # Set SENDGRID_API_KEY in Render dashboard (optional — only for email)
+      # - key: SENDGRID_API_KEY
       #   sync: false
 
-  # ── PostgreSQL database ───────────────────────────────────────────────────────
   - type: pserv
     name: sstg-db
     runtime: postgres
     databaseName: sstg
     databaseUser: sstg_user
-    ipAllowList: []               # internal Render network only
+    ipAllowList: []

@@ -13,7 +13,7 @@ from config import get_settings
 from database import Base, engine
 import models  # noqa: registers all ORM models
 
-import auth, teachers, subjects, classes, schedules, exports, exams, templates_api
+import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays
 import ws_routes as websockets
 
 settings = get_settings()
@@ -138,6 +138,8 @@ app.include_router(schedules.router,  prefix="/schedule", tags=["Schedule"])
 app.include_router(exports.router,    prefix="/export",   tags=["Export & Email"])
 app.include_router(exams.router,         prefix="",          tags=["Exams"])
 app.include_router(templates_api.router, prefix="",          tags=["Templates"])
+app.include_router(ai_scheduler.router,  prefix="",          tags=["AI Assistant"])
+app.include_router(holidays.router,      prefix="",          tags=["Holidays"])
 app.include_router(websockets.router, tags=["WebSockets"])
 
 

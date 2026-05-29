@@ -154,6 +154,22 @@ export const examsAPI = {
 }
 
 
+
+// ── AI Assistant ──────────────────────────────────────────────────────────────
+export const aiAPI = {
+  status:            ()           => api.get('/ai/status'),
+  chat:              (data)       => api.post('/ai/chat', data),
+  generateTimetable: (data)       => api.post('/ai/generate-timetable-prompt', data),
+  optimizeExam:      (data)       => api.post('/ai/optimize-exam', data),
+}
+
+// ── Holidays ──────────────────────────────────────────────────────────────────
+export const holidaysAPI = {
+  get:       (countryCode, year) => api.get(`/holidays/${countryCode}/${year}`),
+  countries: ()                  => api.get('/holidays/supported-countries'),
+  checkDate: (countryCode, date) => api.get(`/holidays/check-date/${countryCode}/${date}`),
+}
+
 // ── Templates ─────────────────────────────────────────────────────────────────
 export const templatesAPI = {
   timetableTemplates: ()           => api.get('/templates/timetable'),

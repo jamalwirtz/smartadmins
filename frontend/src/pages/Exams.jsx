@@ -1,3 +1,4 @@
+import AIAssistant from '../components/AIAssistant'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -821,6 +822,7 @@ export default function Exams() {
         </motion.div>
       )}
     </div>
+    <AIAssistant context="exam" />
   )
 }
 
