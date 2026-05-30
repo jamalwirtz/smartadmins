@@ -31,6 +31,7 @@
 # ── [PROD] Web framework ──────────────────────────────────────────────────────
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0          # [standard] = websockets + httptools + uvloop
+# Note: if uvloop fails on Render, change above to: uvicorn>=0.32.0
 python-multipart>=0.0.12           # Required for OAuth2 form login
 
 # ── [PROD] Database ───────────────────────────────────────────────────────────

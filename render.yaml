@@ -1,6 +1,5 @@
 # render.yaml — SINGLE SERVICE deployment
-# Frontend + Backend served from one Render web service.
-# No CORS. No VITE_API_URL. One bill.
+# Frontend + Backend from one Render web service. No CORS. No VITE_API_URL.
 
 services:
   - type: web
@@ -8,16 +7,13 @@ services:
     runtime: python
     rootDir: .
 
-    # Build: React first, then Python deps — both from project root
     buildCommand: "npm --prefix frontend install && npm --prefix frontend run build && pip install -r requirements.txt"
-
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
-
     healthCheckPath: /health
 
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12"
+        value: "3.12.0"
       - key: NODE_VERSION
         value: "20"
       - key: SECRET_KEY
@@ -32,10 +28,10 @@ services:
         value: "2025/2026"
       - key: CORS_ORIGINS
         value: "*"
-      # Set GEMINI_API_KEY in Render dashboard after getting from Google AI Studio
+      # Uncomment after getting free key from https://aistudio.google.com/app/apikey
       # - key: GEMINI_API_KEY
       #   sync: false
-      # Set SENDGRID_API_KEY in Render dashboard (optional — only for email)
+      # Uncomment after getting free key from https://sendgrid.com
       # - key: SENDGRID_API_KEY
       #   sync: false
 
