@@ -625,24 +625,52 @@ export default function Exams() {
 
   const grid = buildGrid(active.slots)
 
-  return (
+ return (
+  <>
     <div className="page-container">
 
       {/* ── Header ── */}
-      <motion.div className="exam-page-header"
-        initial={{ opacity:0, y:-16 }} animate={{ opacity:1, y:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-          <button className="btn btn-secondary btn-sm"
-            onClick={() => { setView('list'); setActive(null) }}>
-            <ArrowLeft size={14}/>
+      <motion.div
+        className="exam-page-header"
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap'
+          }}
+        >
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              setView('list')
+              setActive(null)
+            }}
+          >
+            <ArrowLeft size={14} />
           </button>
+
           <div>
-            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-              <h1 className="page-title" style={{ margin:0 }}>{active.name}</h1>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flexWrap: 'wrap'
+              }}
+            >
+              <h1 className="page-title" style={{ margin: 0 }}>
+                {active.name}
+              </h1>
+
               <StatusBadge status={active.status} />
             </div>
-            <p className="page-subtitle" style={{ margin:0 }}>
-              <Calendar size={12}/> {active.start_date} → {active.end_date}
+
+            <p className="page-subtitle" style={{ margin: 0 }}>
+              <Calendar size={12} /> {active.start_date} → {active.end_date}
               &nbsp;&nbsp;·&nbsp;&nbsp;
               {(active.slots || []).length} exam slots
             </p>
@@ -650,21 +678,39 @@ export default function Exams() {
         </div>
 
         <div className="exam-header-actions">
-          <button className="btn btn-secondary btn-sm" onClick={handleValidate}>
-            <CheckCircle2 size={13}/> Validate
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={handleValidate}
+          >
+            <CheckCircle2 size={13} /> Validate
           </button>
-          <button className="btn btn-secondary btn-sm"
-            onClick={() => handlePublish(active.id, active.status)}>
-            {active.status === 'draft'
-              ? <><Check size={13}/> Publish</>
-              : <><ArrowLeft size={13}/> Unpublish</>}
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => handlePublish(active.id, active.status)}
+          >
+            {active.status === 'draft' ? (
+              <>
+                <Check size={13} /> Publish
+              </>
+            ) : (
+              <>
+                <ArrowLeft size={13} /> Unpublish
+              </>
+            )}
           </button>
+
           <ExportDropdown
             onPdf={() => handleExport('pdf')}
             onXlsx={() => handleExport('xlsx')}
-            loading={exporting} />
-          <button className="btn btn-accent btn-sm" onClick={() => setShowGenerate(true)}>
-            <Play size={13}/> Generate
+            loading={exporting}
+          />
+
+          <button
+            className="btn btn-accent btn-sm"
+            onClick={() => setShowGenerate(true)}
+          >
+            <Play size={13} /> Generate
           </button>
         </div>
       </motion.div>
@@ -672,168 +718,335 @@ export default function Exams() {
       {/* ── Generate dialog ── */}
       <AnimatePresence>
         {showGenerate && (
-          <motion.div className="card exam-gen-card"
-            initial={{ opacity:0, y:-10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
-              <h3 className="card-title" style={{ margin:0 }}>Auto-Generate Exam Schedule</h3>
-              <button className="exam-modal-close" onClick={() => setShowGenerate(false)}>
-                <X size={16}/>
+          <motion.div
+            className="card exam-gen-card"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 18
+              }}
+            >
+              <h3 className="card-title" style={{ margin: 0 }}>
+                Auto-Generate Exam Schedule
+              </h3>
+
+              <button
+                className="exam-modal-close"
+                onClick={() => setShowGenerate(false)}
+              >
+                <X size={16} />
               </button>
             </div>
+
             <form onSubmit={handleGenerate}>
+
               <div className="exam-gen-grid">
+
                 {/* Subjects */}
                 <div>
-                  <label className="form-label" style={{ marginBottom:8 }}>
+                  <label
+                    className="form-label"
+                    style={{ marginBottom: 8 }}
+                  >
                     Subjects&nbsp;
-                    <span className="exam-sel-count">({genForm.subject_ids.length} selected)</span>
+                    <span className="exam-sel-count">
+                      ({genForm.subject_ids.length} selected)
+                    </span>
                   </label>
+
                   <div className="exam-check-list">
                     {subjects.map(s => (
                       <label key={s.id} className="exam-check-item">
-                        <input type="checkbox"
+                        <input
+                          type="checkbox"
                           checked={genForm.subject_ids.includes(s.id)}
-                          onChange={() => setGenForm(f=>({
-                            ...f, subject_ids: toggleId(f.subject_ids, s.id)
-                          }))} />
+                          onChange={() =>
+                            setGenForm(f => ({
+                              ...f,
+                              subject_ids: toggleId(
+                                f.subject_ids,
+                                s.id
+                              )
+                            }))
+                          }
+                        />
+
                         <span>{s.name}</span>
-                        <span className="exam-check-meta">Gr{s.grade_level}</span>
+
+                        <span className="exam-check-meta">
+                          Gr{s.grade_level}
+                        </span>
                       </label>
                     ))}
                   </div>
                 </div>
+
                 {/* Classes */}
                 <div>
-                  <label className="form-label" style={{ marginBottom:8 }}>
+                  <label
+                    className="form-label"
+                    style={{ marginBottom: 8 }}
+                  >
                     Classes&nbsp;
-                    <span className="exam-sel-count">({genForm.class_ids.length} selected)</span>
+                    <span className="exam-sel-count">
+                      ({genForm.class_ids.length} selected)
+                    </span>
                   </label>
+
                   <div className="exam-check-list">
                     {classes.map(c => (
                       <label key={c.id} className="exam-check-item">
-                        <input type="checkbox"
+                        <input
+                          type="checkbox"
                           checked={genForm.class_ids.includes(c.id)}
-                          onChange={() => setGenForm(f=>({
-                            ...f, class_ids: toggleId(f.class_ids, c.id)
-                          }))} />
+                          onChange={() =>
+                            setGenForm(f => ({
+                              ...f,
+                              class_ids: toggleId(
+                                f.class_ids,
+                                c.id
+                              )
+                            }))
+                          }
+                        />
+
                         <span>{c.name}</span>
-                        <span className="exam-check-meta">Gr{c.grade_level}</span>
+
+                        <span className="exam-check-meta">
+                          Gr{c.grade_level}
+                        </span>
                       </label>
                     ))}
                   </div>
                 </div>
+
               </div>
 
               <div className="exam-gen-options">
+
                 <div className="form-group">
-                  <label className="form-label">Start Period</label>
-                  <input type="number" className="form-input" min={1} max={8}
+                  <label className="form-label">
+                    Start Period
+                  </label>
+
+                  <input
+                    type="number"
+                    className="form-input"
+                    min={1}
+                    max={8}
                     value={genForm.start_period}
-                    onChange={e => setGenForm(f=>({...f, start_period:+e.target.value}))} />
+                    onChange={e =>
+                      setGenForm(f => ({
+                        ...f,
+                        start_period: +e.target.value
+                      }))
+                    }
+                  />
                 </div>
+
                 <div className="form-group">
-                  <label className="form-label">Max Exams / Day</label>
-                  <input type="number" className="form-input" min={1} max={4}
+                  <label className="form-label">
+                    Max Exams / Day
+                  </label>
+
+                  <input
+                    type="number"
+                    className="form-input"
+                    min={1}
+                    max={4}
                     value={genForm.max_per_day}
-                    onChange={e => setGenForm(f=>({...f, max_per_day:+e.target.value}))} />
+                    onChange={e =>
+                      setGenForm(f => ({
+                        ...f,
+                        max_per_day: +e.target.value
+                      }))
+                    }
+                  />
                 </div>
+
                 <div>
-                  <label className="form-label" style={{ marginBottom:8, display:'block' }}>Exam Days</label>
+                  <label
+                    className="form-label"
+                    style={{
+                      marginBottom: 8,
+                      display: 'block'
+                    }}
+                  >
+                    Exam Days
+                  </label>
+
                   <div className="exam-day-toggles">
                     {DAYS.map(d => (
-                      <button key={d} type="button"
-                        className={`exam-day-btn${genForm.school_days.includes(d) ? ' active' : ''}`}
-                        onClick={() => setGenForm(f => ({
-                          ...f, school_days: toggleId(f.school_days, d)
-                        }))}>
-                        {d.slice(0,3)}
+                      <button
+                        key={d}
+                        type="button"
+                        className={`exam-day-btn${
+                          genForm.school_days.includes(d)
+                            ? ' active'
+                            : ''
+                        }`}
+                        onClick={() =>
+                          setGenForm(f => ({
+                            ...f,
+                            school_days: toggleId(
+                              f.school_days,
+                              d
+                            )
+                          }))
+                        }
+                      >
+                        {d.slice(0, 3)}
                       </button>
                     ))}
                   </div>
                 </div>
+
               </div>
 
-              <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:16 }}>
-                <button type="button" className="btn btn-secondary"
-                  onClick={() => setShowGenerate(false)}>Cancel</button>
-                <button type="submit" className="btn btn-accent">
-                  <Play size={14}/> Generate Schedule
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  justifyContent: 'flex-end',
+                  marginTop: 16
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowGenerate(false)}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="btn btn-accent"
+                >
+                  <Play size={14} /> Generate Schedule
                 </button>
               </div>
+
             </form>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ── Timetable grid ── */}
-      {loading ? <Loader /> : !(active.slots?.length) ? (
-        <EmptyState icon={GraduationCap}
+      {loading ? (
+        <Loader />
+      ) : !(active.slots?.length) ? (
+        <EmptyState
+          icon={GraduationCap}
           title="No exam slots yet"
-          body="Click Generate to auto-schedule, or use a template to get started quickly" />
+          body="Click Generate to auto-schedule, or use a template to get started quickly"
+        />
       ) : (
-        <motion.div className="exam-grid-wrap"
-          initial={{ opacity:0 }} animate={{ opacity:1 }}>
+        <motion.div
+          className="exam-grid-wrap"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
           <div className="exam-grid-scroll">
+
             <table className="exam-grid-table">
+
               <thead>
                 <tr>
-                  <th className="exam-grid-period-head">Period</th>
+                  <th className="exam-grid-period-head">
+                    Period
+                  </th>
+
                   {DAYS.map(d => (
-                    <th key={d} className="exam-grid-day-head">{d}</th>
+                    <th
+                      key={d}
+                      className="exam-grid-day-head"
+                    >
+                      {d}
+                    </th>
                   ))}
                 </tr>
               </thead>
+
               <tbody>
-                {(periods.length ? periods : [1,2,3,4]).map(period => (
+                {(periods.length
+                  ? periods
+                  : [1, 2, 3, 4]
+                ).map(period => (
                   <tr key={period}>
-                    <td className="exam-grid-period-cell">P{period}</td>
+
+                    <td className="exam-grid-period-cell">
+                      P{period}
+                    </td>
+
                     {DAYS.map(day => {
-                      const slots = grid[day]?.[period] || []
+                      const slots =
+                        grid[day]?.[period] || []
+
                       return (
-                        <td key={day} className="exam-grid-day-cell">
-                          {slots.length === 0
-                            ? <div className="exam-grid-empty-cell" />
-                            : slots.map(sl => (
-                              <ExamSlotCard key={sl.id} slot={sl}
-                                onLock={lock => handleLock(sl.id, lock)}
-                                onDelete={() => handleDeleteSlot(sl.id)} />
+                        <td
+                          key={day}
+                          className="exam-grid-day-cell"
+                        >
+                          {slots.length === 0 ? (
+                            <div className="exam-grid-empty-cell" />
+                          ) : (
+                            slots.map(sl => (
+                              <ExamSlotCard
+                                key={sl.id}
+                                slot={sl}
+                                onLock={lock =>
+                                  handleLock(sl.id, lock)
+                                }
+                                onDelete={() =>
+                                  handleDeleteSlot(sl.id)
+                                }
+                              />
                             ))
-                          }
+                          )}
                         </td>
                       )
                     })}
                   </tr>
                 ))}
               </tbody>
+
             </table>
           </div>
 
-                {/* Legend */}
-      <div className="exam-legend">
-        <span className="exam-legend-title">Legend:</span>
+          {/* Legend */}
+          <div className="exam-legend">
 
-        <span className="exam-legend-item">
-          <Lock size={10} /> Locked
-        </span>
+            <span className="exam-legend-title">
+              Legend:
+            </span>
 
-        <span className="exam-legend-item">
-          <FlaskConical size={10} /> Practical
-        </span>
+            <span className="exam-legend-item">
+              <Lock size={10} /> Locked
+            </span>
 
-        <span className="exam-legend-item exam-legend-note">
-          Click <Lock size={10} /> to lock a slot
-        </span>
-      </div>
-    </motion.div>
-  )}
-</div>
+            <span className="exam-legend-item">
+              <FlaskConical size={10} /> Practical
+            </span>
 
-<AIAssistant context="exam" />
-</>
-)
-}
+            <span className="exam-legend-item exam-legend-note">
+              Click <Lock size={10} /> to lock a slot
+            </span>
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+          </div>
+        </motion.div>
+      )}
+    </div>
+
+    <AIAssistant context="exam" />
+  </>
+)────────────────────────
 
 function ExamSlotCard({ slot, onLock, onDelete }) {
   const hex = slot.subject_color || '#6366f1'
