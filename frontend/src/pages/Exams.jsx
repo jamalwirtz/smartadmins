@@ -808,96 +808,107 @@ export default function Exams() {
             </table>
           </div>
 
-          {/* Legend */}
-          <div className="exam-legend">
-            <span className="exam-legend-title">Legend:</span>
-            <span className="exam-legend-item"><Lock size={10}/> Locked</span>
-            <span className="exam-legend-item">
-              <FlaskConical size={10}/> Practical
-            </span>
-            <span className="exam-legend-item exam-legend-note">
-              Click <Lock size={10}/> to lock a slot
-            </span>
-          </div>
-        </motion.div>
-      )}
-    </div>
-    <AIAssistant context="exam" />
-  )
+                {/* Legend */}
+      <div className="exam-legend">
+        <span className="exam-legend-title">Legend:</span>
+
+        <span className="exam-legend-item">
+          <Lock size={10} /> Locked
+        </span>
+
+        <span className="exam-legend-item">
+          <FlaskConical size={10} /> Practical
+        </span>
+
+        <span className="exam-legend-item exam-legend-note">
+          Click <Lock size={10} /> to lock a slot
+        </span>
+      </div>
+    </motion.div>
+  )}
+</div>
+
+<AIAssistant context="exam" />
+</>
+)
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function ExamSlotCard({ slot, onLock, onDelete }) {
   const hex = slot.subject_color || '#6366f1'
+
   return (
-    <motion.div className="exam-slot-card"
-      initial={{ opacity:0, scale:.93 }} animate={{ opacity:1, scale:1 }}
+    <motion.div
+      className="exam-slot-card"
+      initial={{ opacity: 0, scale: 0.93 }}
+      animate={{ opacity: 1, scale: 1 }}
       style={{
         borderLeft: `3px solid ${hex}`,
         background: `${hex}14`,
-      }}>
-      <div className="exam-slot-subject"
-        style={{ color: hex }}>
+      }}
+    >
+      <div
+        className="exam-slot-subject"
+        style={{ color: hex }}
+      >
         {slot.subject_name}
+
         {slot.is_practical && (
-          <FlaskConical size={9} style={{ marginLeft:4, opacity:.7 }}/>
+          <FlaskConical
+            size={9}
+            style={{ marginLeft: 4, opacity: 0.7 }}
+          />
         )}
       </div>
-      <div className="exam-slot-paper">Paper {slot.paper_number}</div>
+
+      <div className="exam-slot-paper">
+        Paper {slot.paper_number}
+      </div>
+
       <div className="exam-slot-meta">
         <span>{slot.class_name}</span>
         <span>{slot.duration}min</span>
       </div>
+
       {slot.invigilator_name && (
-        <div className="exam-slot-invig">👤 {slot.invigilator_name}</div>
+        <div className="exam-slot-invig">
+          👤 {slot.invigilator_name}
+        </div>
       )}
+
       {slot.room && (
-        <div className="exam-slot-room">📍 {slot.room}</div>
+        <div className="exam-slot-room">
+          📍 {slot.room}
+        </div>
       )}
+
       <div className="exam-slot-actions">
-        <button className={`exam-slot-btn${slot.is_locked ? ' locked' : ''}`}
+        <button
+          className={`exam-slot-btn${slot.is_locked ? ' locked' : ''}`}
           onClick={() => onLock(!slot.is_locked)}
-          title={slot.is_locked ? 'Unlock slot' : 'Lock slot'}>
-          {slot.is_locked ? <Lock size={10}/> : <Unlock size={10}/>}
+          title={slot.is_locked ? 'Unlock slot' : 'Lock slot'}
+        >
+          {slot.is_locked ? (
+            <Lock size={10} />
+          ) : (
+            <Unlock size={10} />
+          )}
         </button>
+
         {!slot.is_locked && (
-          <button className="exam-slot-btn delete"
-            onClick={onDelete} title="Remove slot">
-            <X size={10}/>
+          <button
+            className="exam-slot-btn delete"
+            onClick={onDelete}
+            title="Remove slot"
+          >
+            <X size={10} />
           </button>
         )}
       </div>
     </motion.div>
   )
 }
-
-function ExportDropdown({ onPdf, onXlsx, loading }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef()
-  useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
-  return (
-    <div className="exam-export-wrap" ref={ref}>
-      <button className="btn btn-secondary btn-sm" onClick={() => setOpen(o => !o)}
-        disabled={!!loading}>
-        {loading
-          ? <><div className="login-spinner" style={{ width:12, height:12, borderWidth:2 }}/> Exporting…</>
-          : <><Download size={13}/> Export <ChevronDown size={11}/></>}
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div className="exam-export-dropdown"
-            initial={{ opacity:0, y:-6, scale:.97 }}
-            animate={{ opacity:1, y:0, scale:1 }}
-            exit={{ opacity:0, y:-6, scale:.97 }}>
-            <button className="exam-export-item" onClick={() => { onPdf(); setOpen(false) }}>
-              <FileText size={14} color="#ef4444"/>
-              <div>
                 <div className="exam-export-item-title">Export as PDF</div>
                 <div className="exam-export-item-sub">Printable schedule by day</div>
               </div>
