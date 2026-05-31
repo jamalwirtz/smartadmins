@@ -13,7 +13,7 @@ from config import get_settings
 from database import Base, engine
 import models  # noqa: registers all ORM models
 
-import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays
+import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings
 import ws_routes as websockets
 
 settings = get_settings()
@@ -32,7 +32,7 @@ def _ensure_demo_data():
     Safe to call every startup — skips if any user already exists.
     """
     from database import SessionLocal
-    from models import User, Teacher, Subject, TeacherSubject, ClassSection
+    from models import User, Teacher, Subject, TeacherSubject, ClassSection, SchoolSettings
     from security import hash_password
 
     db = SessionLocal()
@@ -92,6 +92,14 @@ def _ensure_demo_data():
 
         db.commit()
         print("[boot] Demo data seeded: admin/admin123 + 6 teachers + 9 subjects + 4 classes")
+        # Seed default school settings if not present
+        if not db.query(SchoolSettings).first():
+            db.add(SchoolSettings(
+                school_name="Greenfield Academy",
+                academic_year="2025/2026",
+                country_code="ZA",
+            ))
+            db.commit()
 
     except Exception as e:
         db.rollback()
@@ -139,7 +147,8 @@ app.include_router(exports.router,    prefix="/export",   tags=["Export & Email"
 app.include_router(exams.router,         prefix="",          tags=["Exams"])
 app.include_router(templates_api.router, prefix="",          tags=["Templates"])
 app.include_router(ai_scheduler.router,  prefix="",          tags=["AI Assistant"])
-app.include_router(holidays.router,      prefix="",          tags=["Holidays"])
+app.include_router(holidays.router,         prefix="",          tags=["Holidays"])
+app.include_router(school_settings.router,  prefix="",          tags=["School Settings"])
 app.include_router(websockets.router, tags=["WebSockets"])
 
 

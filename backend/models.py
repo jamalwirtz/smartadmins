@@ -193,3 +193,52 @@ class ExamSession(Base):
     updated_at  = Column(DateTime(timezone=True), default=_now, onupdate=_now)
     
     slots = relationship("ExamSlot", back_populates="exam_session", cascade="all, delete-orphan")
+
+
+class SchoolSettings(Base):
+    """
+    School-wide configuration stored in the database.
+    Editable from Settings page by admin.
+    One row per school (id = 1).
+    """
+    __tablename__ = "school_settings"
+
+    id            = Column(Integer, primary_key=True, default=1)
+    school_name   = Column(String(120), default="Greenfield Academy")
+    academic_year = Column(String(20),  default="2025/2026")
+    school_motto  = Column(String(200), nullable=True)
+    school_email  = Column(String(120), nullable=True)
+    school_phone  = Column(String(40),  nullable=True)
+    school_address= Column(String(300), nullable=True)
+    country_code  = Column(String(4),   default="ZA")
+    badge_data    = Column(Text,        nullable=True)   # base64-encoded logo image
+    badge_mime    = Column(String(30),  nullable=True)   # "image/png" | "image/jpeg"
+    # Timetable time config
+    start_time    = Column(String(5),   default="08:00")  # "08:00"
+    period_minutes= Column(Integer,     default=45)
+    break_after_period = Column(Integer, default=2)      # break after period N
+    break_minutes = Column(Integer,     default=15)
+    lunch_after_period = Column(Integer, default=4)
+    lunch_minutes = Column(Integer,     default=45)
+    # Display preferences
+    timetable_theme     = Column(String(20), default="navy")   # navy|green|amber|rose|slate
+    timetable_orientation = Column(String(12), default="horizontal") # horizontal|vertical
+    periods_per_day     = Column(Integer, default=8)
+    school_days         = Column(String(80), default="Monday,Tuesday,Wednesday,Thursday,Friday")
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class UserProfile(Base):
+    """Extended profile for user — photo, display name, etc."""
+    __tablename__ = "user_profiles"
+
+    id           = Column(String(36), primary_key=True, default=_uuid)
+    user_id      = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"),
+                          nullable=False, unique=True)
+    display_name = Column(String(80),  nullable=True)
+    bio          = Column(String(300), nullable=True)
+    photo_data   = Column(Text,        nullable=True)   # base64 encoded
+    photo_mime   = Column(String(30),  nullable=True)
+    updated_at   = Column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    user = relationship("User", backref="profile")

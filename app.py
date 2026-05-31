@@ -1,25 +1,28 @@
 """
-SSTG — Entry-point shim
-========================
-Lets you run the server with just:   python app.py
-Or via uvicorn directly:             uvicorn main:app --reload
+SSTG — Root entry-point shim
+==============================
+Convenience wrapper so you can run the server from the project root.
 
-Render.com start command:            uvicorn main:app --host 0.0.0.0 --port $PORT
-  (NOT app.main:app — files are flat, no nested package)
+Usage (from project root):
+    python app.py
+
+Or run directly from backend/:
+    cd backend
+    uvicorn main:app --reload
 """
 import os
 import sys
 
-# Make sure backend/ is on the path when run from any directory
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add backend/ to path so all imports resolve correctly
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend"))
 
-from main import app  # noqa: E402  — re-export for uvicorn / gunicorn
+from main import app  # noqa: F401 — re-export
 
 if __name__ == "__main__":
     try:
         import uvicorn
     except ImportError:
-        print("uvicorn not installed. Run:  pip install -r requirements.txt")
+        print("uvicorn not installed. Run:  pip install -r backend/requirements.txt")
         sys.exit(1)
 
     uvicorn.run(
@@ -27,5 +30,6 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=int(os.getenv("PORT", 8000)),
         reload=True,
+        reload_dirs=["backend"],
         log_level="info",
     )

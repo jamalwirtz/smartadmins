@@ -22,157 +22,252 @@ except ImportError:
 cfg = get_settings()
 
 
+# ── PDF Themes ─────────────────────────────────────────────────────────────────
+PDF_THEMES = {
+    "navy": {
+        "header_bg":"#1A237E","header_fg":"#FFFFFF",
+        "row_a":"#FFFFFF",    "row_b":"#E8EAF6",
+        "grid":"#9FA8DA",     "title":"#1A237E","accent":"#3949AB",
+    },
+    "green": {
+        "header_bg":"#1B5E20","header_fg":"#FFFFFF",
+        "row_a":"#FFFFFF",    "row_b":"#E8F5E9",
+        "grid":"#A5D6A7",     "title":"#1B5E20","accent":"#388E3C",
+    },
+    "amber": {
+        "header_bg":"#E65100","header_fg":"#FFFFFF",
+        "row_a":"#FFFFFF",    "row_b":"#FFF3E0",
+        "grid":"#FFCC80",     "title":"#BF360C","accent":"#FB8C00",
+    },
+    "rose": {
+        "header_bg":"#880E4F","header_fg":"#FFFFFF",
+        "row_a":"#FFFFFF",    "row_b":"#FCE4EC",
+        "grid":"#F48FB1",     "title":"#880E4F","accent":"#C2185B",
+    },
+    "slate": {
+        "header_bg":"#263238","header_fg":"#FFFFFF",
+        "row_a":"#FFFFFF",    "row_b":"#ECEFF1",
+        "grid":"#B0BEC5",     "title":"#263238","accent":"#455A64",
+    },
+}
+
+
 class PDFExporter:
 
     def _check(self):
         if not RL:
             raise HTTPException(503, "reportlab not installed. Run: pip install reportlab")
 
-    def _header(self, story, title: str):
+    def _theme(self, db=None) -> dict:
+        name = "navy"
+        if db:
+            try:
+                from models import SchoolSettings
+                s = db.query(SchoolSettings).first()
+                if s and s.timetable_theme:
+                    name = s.timetable_theme
+            except Exception:
+                pass
+        return PDF_THEMES.get(name, PDF_THEMES["navy"])
+
+    def _school_info(self, db=None) -> dict:
+        info = {"name": cfg.SCHOOL_NAME, "year": cfg.ACADEMIC_YEAR,
+                "motto": "", "badge_b64": None, "badge_mime": None}
+        if db:
+            try:
+                from models import SchoolSettings
+                s = db.query(SchoolSettings).first()
+                if s:
+                    info.update({
+                        "name":      s.school_name or cfg.SCHOOL_NAME,
+                        "year":      s.academic_year or cfg.ACADEMIC_YEAR,
+                        "motto":     s.school_motto or "",
+                        "badge_b64": s.badge_data,
+                        "badge_mime":s.badge_mime,
+                    })
+            except Exception:
+                pass
+        return info
+
+    def _time_labels(self, db=None) -> dict:
+        labels = {}
+        if not db: return labels
+        try:
+            from models import SchoolSettings
+            s = db.query(SchoolSettings).first()
+            if not s: return labels
+            h, m = map(int, s.start_time.split(":"))
+            cur  = h*60+m
+            for p in range(1, s.periods_per_day+1):
+                st = f"{cur//60:02d}:{cur%60:02d}"; cur += s.period_minutes
+                en = f"{cur//60:02d}:{cur%60:02d}"
+                labels[p] = f"{st}\u2013{en}"
+                if p == s.break_after_period:  cur += s.break_minutes
+                if p == s.lunch_after_period:  cur += s.lunch_minutes
+        except Exception:
+            pass
+        return labels
+
+    def _header(self, story, title: str, db=None):
+        import base64 as _b64
+        from reportlab.platypus import HRFlowable
+        school = self._school_info(db)
+        theme  = self._theme(db)
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle("T", parent=styles["Title"], fontSize=18,
-                                      textColor=colors.HexColor("#1a237e"), spaceAfter=4)
-        sub_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=9,
-                                    textColor=colors.grey, spaceAfter=10)
-        story.append(Paragraph(cfg.SCHOOL_NAME, title_style))
-        story.append(Paragraph(f"{title}  |  Academic Year: {cfg.ACADEMIC_YEAR}", sub_style))
-        story.append(Spacer(1, 0.3 * cm))
+        TS = ParagraphStyle("T", parent=styles["Title"], fontSize=16,
+                             textColor=colors.HexColor(theme["title"]),
+                             fontName="Helvetica-Bold", spaceAfter=2)
+        SS = ParagraphStyle("S", parent=styles["Normal"], fontSize=9,
+                             textColor=colors.grey, spaceAfter=2)
+        MS = ParagraphStyle("M", parent=styles["Normal"], fontSize=9,
+                             textColor=colors.HexColor(theme["accent"]),
+                             fontName="Helvetica-Oblique", spaceAfter=6)
 
-    def full_draft_pdf(self, draft: TimetableDraft, db: Session) -> bytes:
+        if school["badge_b64"]:
+            try:
+                from io import BytesIO as BIO
+                from reportlab.platypus import Image as RLImg
+                badge = RLImg(BIO(_b64.b64decode(school["badge_b64"])),
+                              width=1.8*cm, height=1.8*cm)
+                tbl = Table([[badge, [
+                    Paragraph(school["name"], TS),
+                    Paragraph(f"{title}  |  {school['year']}", SS),
+                ]]], colWidths=[2.2*cm, None])
+                tbl.setStyle(TableStyle([
+                    ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                    ("LEFTPADDING",(0,0),(0,0),0),
+                    ("RIGHTPADDING",(0,0),(0,0),8),
+                ]))
+                story.append(tbl)
+            except Exception:
+                story.append(Paragraph(school["name"], TS))
+                story.append(Paragraph(f"{title} | {school['year']}", SS))
+        else:
+            story.append(Paragraph(school["name"], TS))
+            story.append(Paragraph(f"{title}  |  Academic Year: {school['year']}", SS))
+
+        if school["motto"]:
+            story.append(Paragraph(f"\u201c{school['motto']}\u201d", MS))
+        story.append(HRFlowable(width="100%", thickness=1.5,
+                                  color=colors.HexColor(theme["header_bg"]),spaceAfter=8))
+
+    def _tbl_style(self, theme: dict) -> TableStyle:
+        return TableStyle([
+            ("BACKGROUND",    (0,0),(-1,0),  colors.HexColor(theme["header_bg"])),
+            ("TEXTCOLOR",     (0,0),(-1,0),  colors.HexColor(theme["header_fg"])),
+            ("FONTNAME",      (0,0),(-1,0),  "Helvetica-Bold"),
+            ("FONTSIZE",      (0,0),(-1,0),  9),
+            ("FONTSIZE",      (0,1),(-1,-1), 8),
+            ("ALIGN",         (0,0),(-1,-1), "CENTER"),
+            ("VALIGN",        (0,0),(-1,-1), "MIDDLE"),
+            ("GRID",          (0,0),(-1,-1), 0.4, colors.HexColor(theme["grid"])),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1), [
+                colors.HexColor(theme["row_a"]), colors.HexColor(theme["row_b"])
+            ]),
+            ("TOPPADDING",    (0,0),(-1,-1), 5),
+            ("BOTTOMPADDING", (0,0),(-1,-1), 5),
+        ])
+
+    def full_draft_pdf(self, draft, db: Session) -> bytes:
         self._check()
-        buf = BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
-                                 leftMargin=1*cm, rightMargin=1*cm,
-                                 topMargin=1.5*cm, bottomMargin=1.5*cm)
-        story = []
-        self._header(story, draft.name)
+        buf   = BytesIO()
+        doc   = SimpleDocTemplate(buf, pagesize=landscape(A4),
+                                   leftMargin=1*cm, rightMargin=1*cm,
+                                   topMargin=1.5*cm, bottomMargin=1.5*cm)
+        story  = []
+        theme  = self._theme(db)
+        tlabels= self._time_labels(db)
+        self._header(story, draft.name, db)
 
-        days = cfg.school_days_list
+        days    = cfg.school_days_list
         periods = list(range(1, cfg.PERIODS_PER_DAY + 1))
-        slots = db.query(TimetableSlot).filter(TimetableSlot.draft_id == draft.id).all()
-        subj_map: Dict[str, Subject] = {s.id: s for s in db.query(Subject).all()}
-        tchr_map: Dict[str, Teacher] = {t.id: t for t in db.query(Teacher).all()}
-        cls_map: Dict[str, ClassSection] = {c.id: c for c in db.query(ClassSection).all()}
-
-        slot_idx: Dict[str, Dict] = defaultdict(dict)
+        slots   = db.query(TimetableSlot).filter(TimetableSlot.draft_id == draft.id).all()
+        subj_map = {s.id: s for s in db.query(Subject).all()}
+        tchr_map = {t.id: t for t in db.query(Teacher).all()}
+        slot_idx = defaultdict(dict)
         for s in slots:
             slot_idx[s.class_id][(s.day, s.period)] = s
 
+        styles = getSampleStyleSheet()
         for cls in db.query(ClassSection).all():
-            styles = getSampleStyleSheet()
-            story.append(Paragraph(f"Class: {cls.name}  (Grade {cls.grade_level})", styles["Heading2"]))
-            story.append(Spacer(1, 0.15*cm))
-
-            header = ["Period"] + days
+            story.append(Paragraph(
+                f"Class {cls.name}  ·  Grade {cls.grade_level}",
+                ParagraphStyle("CH", parent=styles["Heading2"],
+                               textColor=colors.HexColor(theme["title"]),
+                               spaceAfter=4, spaceBefore=12)))
+            header = ["Period / Time"] + days
             rows = [header]
             for p in periods:
-                row = [str(p)]
+                lbl = tlabels.get(p, "")
+                row = [f"P{p}\n{lbl}" if lbl else str(p)]
                 for d in days:
-                    s = slot_idx[cls.id].get((d, p))
-                    if s and s.subject_id:
-                        subj = subj_map.get(s.subject_id)
-                        tchr = tchr_map.get(s.teacher_id) if s.teacher_id else None
-                        cell = f"{'[L] ' if s.is_locked else ''}{subj.name if subj else '?'}\n{tchr.name if tchr else ''}"
+                    sl = slot_idx[cls.id].get((d, p))
+                    if sl and sl.subject_id:
+                        subj = subj_map.get(sl.subject_id)
+                        tchr = tchr_map.get(sl.teacher_id) if sl.teacher_id else None
+                        row.append(f"{subj.name if subj else "?"}"
+                                   f"\n{tchr.name.split()[0] if tchr else ""}")
                     else:
-                        cell = ""
-                    row.append(cell)
+                        row.append("")
                 rows.append(row)
 
-            col_w = [1.5*cm] + [3.2*cm] * len(days)
-            tbl = Table(rows, colWidths=col_w, repeatRows=1)
-            tbl.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#283593")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 9),
-                ("FONTSIZE", (0, 1), (-1, -1), 8),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#9fa8da")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#e8eaf6")]),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ]))
+            cw = [2.2*cm] + [3.0*cm]*len(days)
+            tbl = Table(rows, colWidths=cw, repeatRows=1)
+            tbl.setStyle(self._tbl_style(theme))
             story.append(tbl)
-            story.append(Spacer(1, 0.8*cm))
+            story.append(Spacer(1, 0.6*cm))
 
         doc.build(story)
         return buf.getvalue()
 
-    def teacher_pdf(self, teacher: Teacher, draft: TimetableDraft, db: Session) -> bytes:
+    def teacher_pdf(self, teacher, draft, db: Session) -> bytes:
         self._check()
-        buf = BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4,
-                                 leftMargin=2*cm, rightMargin=2*cm,
-                                 topMargin=2*cm, bottomMargin=2*cm)
-        story = []
-        self._header(story, f"Weekly Schedule — {teacher.name}")
+        buf   = BytesIO()
+        doc   = SimpleDocTemplate(buf, pagesize=A4,
+                                   leftMargin=1.5*cm, rightMargin=1.5*cm,
+                                   topMargin=1.5*cm, bottomMargin=1.5*cm)
+        story  = []
+        theme  = self._theme(db)
+        tlabels= self._time_labels(db)
+        self._header(story, f"Teacher Schedule — {teacher.name}", db)
 
-        days = cfg.school_days_list
+        days    = cfg.school_days_list
         periods = list(range(1, cfg.PERIODS_PER_DAY + 1))
-        slots = (
-            db.query(TimetableSlot)
-            .filter(TimetableSlot.draft_id == draft.id, TimetableSlot.teacher_id == teacher.id)
-            .all()
-        )
+        slots   = (db.query(TimetableSlot)
+                   .filter(TimetableSlot.draft_id   == draft.id,
+                           TimetableSlot.teacher_id == teacher.id).all())
         subj_map = {s.id: s for s in db.query(Subject).all()}
-        cls_map = {c.id: c for c in db.query(ClassSection).all()}
-        slot_idx = {(s.day, s.period): s for s in slots}
+        cls_map  = {c.id: c for c in db.query(ClassSection).all()}
+        slot_idx = defaultdict(dict)
+        for s in slots:
+            slot_idx[s.day][s.period] = s
 
-        header = ["Period"] + days
-        rows = [header]
-        total = 0
+        styles = getSampleStyleSheet()
+        header = ["Period / Time"] + days
+        rows   = [header]
         for p in periods:
-            row = [str(p)]
+            lbl = tlabels.get(p, "")
+            row = [f"P{p}\n{lbl}" if lbl else str(p)]
             for d in days:
-                s = slot_idx.get((d, p))
-                if s and s.subject_id:
-                    subj = subj_map.get(s.subject_id)
-                    cls = cls_map.get(s.class_id)
-                    row.append(f"{subj.name if subj else '?'}\n{cls.name if cls else ''}")
-                    total += 1
+                sl = slot_idx[d].get(p)
+                if sl:
+                    subj = subj_map.get(sl.subject_id)
+                    cls  = cls_map.get(sl.class_id)
+                    row.append(f"{subj.name if subj else "?"}\n{cls.name if cls else ""}")
                 else:
                     row.append("")
             rows.append(row)
 
-        col_w = [1.5*cm] + [3*cm] * len(days)
-        tbl = Table(rows, colWidths=col_w, repeatRows=1)
-        tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#004d40")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 9),
-            ("FONTSIZE", (0, 1), (-1, -1), 8),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#80cbc4")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#e0f2f1")]),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ]))
+        cw  = [2.2*cm] + [2.8*cm]*len(days)
+        tbl = Table(rows, colWidths=cw, repeatRows=1)
+        tbl.setStyle(self._tbl_style(theme))
         story.append(tbl)
         story.append(Spacer(1, 0.5*cm))
-        styles = getSampleStyleSheet()
         story.append(Paragraph(
-            f"Total periods assigned: {total}  /  Max: {teacher.max_weekly_hours}  |  "
-            f"Remaining capacity: {teacher.max_weekly_hours - total}",
-            styles["Normal"],
-        ))
+            f"Periods/week: {len(slots)}  ·  Max: {teacher.max_weekly_hours}",
+            ParagraphStyle("F", parent=styles["Normal"], fontSize=8, textColor=colors.grey)))
         doc.build(story)
         return buf.getvalue()
-
-
-# ── Excel / CSV exports ───────────────────────────────────────────────────────
-
-try:
-    import openpyxl
-    from openpyxl.styles import (
-        Font, PatternFill, Alignment, Border, Side, GradientFill
-    )
-    from openpyxl.utils import get_column_letter
-    XLSX = True
-except ImportError:
-    XLSX = False
 
 _NAVY   = "1A237E"
 _TEAL   = "004D40"

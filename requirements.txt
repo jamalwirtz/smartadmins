@@ -107,11 +107,3 @@ pytest-mock>=3.14.0                # Mocking helpers
 # =============================================================================
 
 openpyxl>=3.1.2                    # Excel (.xlsx) export
-# Root-level requirements — delegates to backend/requirements.txt
-# This allows `pip install -r requirements.txt` from the project root
--r backend/requirements.txt
-
-# Free API integrations
-google-generativeai>=0.8.0     # Google Gemini AI (free tier: 1M tokens/day)
-httpx>=0.28.0                  # Already in backend, used for Nager.Date holidays API
-sendgrid>=6.11.0               # SendGrid email (100/day free, no SMTP config needed)

@@ -40,67 +40,40 @@ function TimetableCell({ slot, onLock, isDragging }) {
   const border = slot.subject_color ? `${slot.subject_color}40` : 'var(--border)'
 
   return (
-  <>
     <motion.div
       ref={setNodeRef}
       className={`tt-cell${slot.is_locked ? ' locked' : ''}`}
       style={{ background: bg, borderColor: border, ...style }}
       layout
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity:0, scale:0.9 }}
+      animate={{ opacity:1, scale:1 }}
+      exit={{ opacity:0, scale:0.8 }}
       transition={{ duration: 0.2 }}
       {...(slot.is_locked ? {} : { ...attributes, ...listeners })}
     >
-      <div
-        className="tt-cell-subject"
-        style={{ color: slot.subject_color || 'var(--navy-900)' }}
-      >
+      <div className="tt-cell-subject" style={{ color: slot.subject_color || 'var(--navy-900)' }}>
         {slot.subject_name}
       </div>
-
-      <div className="tt-cell-teacher">
-        {slot.teacher_name}
-      </div>
-
-      {slot.class_name && (
-        <div className="tt-cell-class">
-          {slot.class_name}
-        </div>
-      )}
+      <div className="tt-cell-teacher">{slot.teacher_name}</div>
+      {slot.class_name && <div className="tt-cell-class">{slot.class_name}</div>}
 
       {/* Lock toggle */}
       <button
-        onClick={e => {
-          e.stopPropagation()
-          onLock(slot)
-        }}
+        onClick={e => { e.stopPropagation(); onLock(slot) }}
         title={slot.is_locked ? 'Unlock slot' : 'Lock slot'}
         style={{
-          position: 'absolute',
-          bottom: 5,
-          right: 5,
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          padding: 2,
-          opacity: 0.5,
-          transition: 'opacity 0.1s',
+          position:'absolute', bottom:5, right:5,
+          background:'none', border:'none', cursor:'pointer',
+          padding:2, opacity:0.5, transition:'opacity 0.1s',
         }}
-        onMouseEnter={e => (e.currentTarget.style.opacity = 1)}
-        onMouseLeave={e => (e.currentTarget.style.opacity = 0.5)}
+        onMouseEnter={e => e.currentTarget.style.opacity=1}
+        onMouseLeave={e => e.currentTarget.style.opacity=0.5}
       >
-        {slot.is_locked ? (
-          <Lock size={9} color="var(--amber)" />
-        ) : (
-          <Unlock size={9} color="var(--muted)" />
-        )}
+        {slot.is_locked ? <Lock size={9} color="var(--amber)" /> : <Unlock size={9} color="var(--muted)" />}
       </button>
     </motion.div>
-
     <AIAssistant context="timetable" />
-  </>
-)
+  )
 }
 
 // ── Droppable cell wrapper ────────────────────────────────────────────────────

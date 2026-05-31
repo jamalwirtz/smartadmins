@@ -155,6 +155,31 @@ export const examsAPI = {
 
 
 
+
+// ── School Settings & Profile ─────────────────────────────────────────────────
+export const schoolAPI = {
+  getSettings:    ()           => api.get('/school/settings'),
+  updateSettings: (data)       => api.put('/school/settings', data),
+  uploadBadge:    (file)       => {
+    const f = new FormData(); f.append('file', file)
+    return api.post('/school/badge', f, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  deleteBadge:    ()           => api.delete('/school/badge'),
+  badgeUrl:       ()           => `${BASE}/school/badge`,
+  timeSchedule:   ()           => api.get('/school/time-schedule'),
+}
+
+export const profileAPI = {
+  get:         ()       => api.get('/profile/me'),
+  update:      (data)   => api.put('/profile/me', data),
+  uploadPhoto: (file)   => {
+    const f = new FormData(); f.append('file', file)
+    return api.post('/profile/photo', f, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  deletePhoto: ()       => api.delete('/profile/photo'),
+  photoUrl:    (userId) => `${BASE}/profile/${userId}/photo`,
+}
+
 // ── AI Assistant ──────────────────────────────────────────────────────────────
 export const aiAPI = {
   status:            ()           => api.get('/ai/status'),
