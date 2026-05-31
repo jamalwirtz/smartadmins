@@ -101,6 +101,7 @@ function TimetableCell({ slot, onLock, isDragging }) {
     <AIAssistant context="timetable" />
   </>
 )
+}
 
 // ── Droppable cell wrapper ────────────────────────────────────────────────────
 function DroppableCell({ id, children }) {
