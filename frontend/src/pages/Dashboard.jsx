@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  teachersAPI, subjectsAPI, classesAPI, schedulesAPI, examsAPI
+  teachersAPI, subjectsAPI, classesAPI, schedulesAPI, examsAPI, allocationsAPI
 } from '../api/client'
 import { fmt, plural, greeting as timeGreeting } from '../utils/format'
 import { SkeletonDashboard } from '../components/Skeleton'
@@ -21,15 +21,18 @@ export default function Dashboard() {
   const navigate   = useNavigate()
   const { user }   = useAuth()
   const [stats,    setStats]   = useState({ teachers:0,subjects:0,classes:0,drafts:0,exams:0,active:null })
+  const [pending,   setPending]  = useState([])   // pending allocations
   const [loading,  setLoading] = useState(true)
   const [greeting, setGreeting]= useState('')
 
   const load = async () => {
     try {
-      const [t, s, c, d, ex] = await Promise.all([
+      const [t, s, c, d, ex, pend] = await Promise.all([
         teachersAPI.list(), subjectsAPI.list(), classesAPI.list(),
-        schedulesAPI.drafts(), examsAPI.listSessions().catch(() => ({ data:[] }))
+        schedulesAPI.drafts(), examsAPI.listSessions().catch(() => ({ data:[] })),
+        allocationsAPI.pending().catch(() => ({ data:[] }))
       ])
+      setPending(pend.data)
       const active = d.data.find(x => x.status === 'active')
       setStats({
         teachers: t.data.length, subjects: s.data.length,
@@ -137,7 +140,7 @@ export default function Dashboard() {
           <h1>{greeting}, {name} 👋</h1>
           <p className="dash-hero-sub">
             {isReady
-              ? `${pct}% setup complete · ${stats.active ? `Active timetable: ${stats.active.name}` : 'No active timetable yet'}`
+              ? `${pct}% setup complete · ${stats.active ? `Active timetable: ${stats.active.name}` : 'No active timetable yet'}${pending.length ? ` · ${pending.length} pending allocation${pending.length!==1?'s':''}` : ''}`
               : `Let's get your school configured — ${STEPS.filter(s=>!s.done).length} step${STEPS.filter(s=>!s.done).length!==1?'s':''} remaining`}
           </p>
           {/* Progress bar */}
@@ -231,6 +234,57 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* ── Pending Allocations ── */}
+      {pending.length > 0 && (
+        <motion.div className="dash-card" variants={fadeUp}
+          style={{marginBottom:0,border:'1.5px solid rgba(245,158,11,.3)',
+            background:'rgba(245,158,11,.03)'}}>
+          <div className="dash-card-title">
+            <span style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{width:8,height:8,borderRadius:'50%',background:'#f59e0b',display:'inline-block'}}/>
+              Pending Allocations
+              <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:20,
+                background:'rgba(245,158,11,.15)',color:'#f59e0b'}}>{pending.length}</span>
+            </span>
+            <button className="btn btn-sm btn-secondary"
+              onClick={() => navigate('/classes')}>
+              Allocate Teachers <ChevronRight size={12}/>
+            </button>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {pending.slice(0,6).map(p => (
+              <div key={p.id} style={{
+                display:'flex',alignItems:'center',gap:12,
+                padding:'8px 12px',background:'var(--surface-2)',
+                borderRadius:8,border:'1px solid var(--border)'}}>
+                <div style={{
+                  width:8,height:8,borderRadius:'50%',flexShrink:0,
+                  background:p.subject_color||'#6366f1'}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <span style={{fontWeight:700,fontSize:13,color:'var(--text)'}}>
+                    {p.subject_name}
+                  </span>
+                  <span style={{fontSize:12,color:'var(--muted)',marginLeft:8}}>
+                    → {p.class_name}
+                  </span>
+                </div>
+                <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',
+                  borderRadius:10,background:'rgba(245,158,11,.12)',color:'#f59e0b',
+                  whiteSpace:'nowrap'}}>No teacher</span>
+              </div>
+            ))}
+            {pending.length > 6 && (
+              <div style={{fontSize:12,color:'var(--muted)',textAlign:'center',padding:'4px 0'}}>
+                +{pending.length - 6} more pending · <button
+                  style={{background:'none',border:'none',color:'var(--amber)',
+                    cursor:'pointer',fontWeight:700,fontSize:12}}
+                  onClick={() => navigate('/classes')}>View all</button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Bottom grid ── */}
       <motion.div className="dash-grid" variants={stagger}>

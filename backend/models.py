@@ -92,6 +92,8 @@ class ClassSection(Base):
     name                = Column(String(40),  nullable=False)
     grade_level         = Column(String(20),  nullable=False)
     max_subjects_per_day= Column(Integer, default=8)
+    stream              = Column(String(40),  nullable=True)   # e.g. "Blue", "Science"
+    capacity            = Column(Integer,     default=40)      # max students
     created_at          = Column(DateTime(timezone=True), default=_now)
 
     timetable_slots = relationship("TimetableSlot", back_populates="class_section")
@@ -242,3 +244,28 @@ class UserProfile(Base):
     updated_at   = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
     user = relationship("User", backref="profile")
+
+
+class ClassAllocation(Base):
+    """
+    Tracks which teacher is allocated to teach a subject in a specific class.
+    Status = 'pending' when no teacher assigned yet, 'assigned' when one is set.
+    This drives the pending-allocations dashboard widget.
+    """
+    __tablename__ = "class_allocations"
+    __table_args__ = (
+        UniqueConstraint("class_id", "subject_id", name="uq_class_subject"),
+    )
+
+    id         = Column(String(36), primary_key=True, default=_uuid)
+    class_id   = Column(String(36), ForeignKey("class_sections.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(String(36), ForeignKey("subjects.id",       ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(String(36), ForeignKey("teachers.id",       ondelete="SET NULL"), nullable=True)
+    status     = Column(String(12), default="pending")  # pending | assigned
+    notes      = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    class_section = relationship("ClassSection", backref="allocations")
+    subject       = relationship("Subject")
+    teacher       = relationship("Teacher")

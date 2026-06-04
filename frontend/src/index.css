@@ -3551,3 +3551,474 @@ input::placeholder, textarea::placeholder {
 /* But NOT for animations — they handle their own timing */
 [class*="motion-"], .ai-typing-dot, .exam-loader-ring,
 .login-spinner { transition: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MULTI-STEP WIZARD — class creation flow
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.wizard-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+
+.wizard-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  width: 100%; max-width: 700px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,.35);
+  display: flex; flex-direction: column;
+}
+
+.wizard-header {
+  display: flex; justify-content: space-between;
+  align-items: flex-start;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wizard-title {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 800;
+  color: var(--text); margin: 0 0 3px;
+}
+
+.wizard-sub { font-size: 13px; color: var(--muted); margin: 0; }
+
+.wizard-close {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 6px; cursor: pointer;
+  color: var(--muted); display: flex; align-items: center;
+  transition: background .14s;
+}
+.wizard-close:hover { background: var(--border); color: var(--text); }
+
+/* ── Step indicator bar ── */
+.wizard-steps {
+  display: flex; align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  gap: 0; overflow-x: auto;
+}
+
+.wizard-step-wrap {
+  display: flex; align-items: center;
+  flex: 1; min-width: 0;
+}
+
+.wizard-step-dot {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  transition: all .2s;
+}
+.wizard-step-dot.active {
+  background: var(--amber); border-color: var(--amber);
+  color: #000; font-weight: 700;
+}
+.wizard-step-dot.done {
+  background: rgba(16,185,129,.15);
+  border-color: #10b981; color: #10b981;
+}
+
+.wizard-step-label {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  margin-left: 8px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.wizard-step-label.active { color: var(--text); }
+
+.wizard-step-line {
+  flex: 1; height: 2px; background: var(--border);
+  margin: 0 8px; min-width: 20px;
+  transition: background .2s;
+}
+.wizard-step-line.done { background: #10b981; }
+
+/* ── Wizard body + footer ── */
+.wizard-body { padding: 20px 24px; flex: 1; }
+
+.wizard-step-content { display: flex; flex-direction: column; gap: 0; }
+
+.wizard-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin-top: 22px; padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Wizard form fields ── */
+.wizard-form-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-bottom: 8px;
+}
+
+.wiz-field { display: flex; flex-direction: column; gap: 5px; }
+
+.wiz-label {
+  font-size: 12px; font-weight: 700;
+  color: var(--text); display: flex; gap: 4px;
+}
+.wiz-req { color: var(--amber); }
+
+.wiz-input {
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 9px 12px; font-size: 13px;
+  color: var(--text); width: 100%; outline: none;
+  transition: border-color .15s;
+}
+.wiz-input:focus { border-color: rgba(41,82,163,.5); }
+.wiz-input::placeholder { color: var(--muted); }
+
+.wiz-select {
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 9px 32px 9px 12px;
+  font-size: 13px; color: var(--text);
+  width: 100%; outline: none; cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+  transition: border-color .15s;
+}
+.wiz-select:focus { border-color: rgba(41,82,163,.5); }
+
+/* ── Subject selection grid ── */
+.wiz-subject-grid {
+  display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr));
+  gap: 8px; margin-bottom: 14px;
+  max-height: 260px; overflow-y: auto;
+  padding: 2px;
+}
+
+.wiz-subject-card {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: var(--r-lg);
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer; text-align: left;
+  transition: border-color .14s, background .14s;
+  min-width: 0;
+}
+.wiz-subject-card:hover { border-color: var(--border-2); }
+.wiz-subject-card.selected { box-shadow: 0 0 0 2px rgba(245,158,11,.2); }
+
+.wiz-subject-dot {
+  width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+}
+.wiz-subject-name {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wiz-subject-code {
+  font-size: 10px; color: var(--muted); font-family: var(--font-mono);
+}
+.wiz-subject-check {
+  position: absolute; top: 4px; right: 4px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--amber); display: flex;
+  align-items: center; justify-content: center; color: #000;
+}
+
+.wiz-add-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 10px;
+  border: 1.5px dashed var(--border-2);
+  background: transparent; border-radius: var(--r-lg);
+  color: var(--muted); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .14s; margin-top: 4px;
+}
+.wiz-add-btn:hover {
+  border-color: var(--amber); color: var(--amber);
+  background: rgba(245,158,11,.05);
+}
+
+.wiz-new-subject {
+  margin-top: 10px; padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.wiz-new-subject-fields {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+
+/* ── Teacher assignment rows ── */
+.wiz-info-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; margin-bottom: 16px;
+  background: rgba(245,158,11,.07);
+  border: 1px solid rgba(245,158,11,.25);
+  border-radius: var(--r-lg); font-size: 12.5px; color: var(--text);
+  line-height: 1.5;
+}
+
+.wiz-teacher-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+
+.wiz-teacher-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--r-lg);
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  transition: border-color .14s;
+}
+.wiz-teacher-row.pending { border-color: rgba(245,158,11,.3); }
+
+.wiz-teacher-subject {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 140px; flex-shrink: 0;
+}
+.wiz-teacher-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+.wiz-teacher-subj-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.wiz-teacher-code      { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+.wiz-teacher-select {
+  flex: 1; min-width: 0;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--r-lg); padding: 7px 28px 7px 10px;
+  font-size: 12px; color: var(--text); outline: none;
+  cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+  transition: border-color .14s;
+}
+.wiz-teacher-select:focus { border-color: rgba(41,82,163,.5); }
+
+.wiz-teacher-status {
+  font-size: 11px; font-weight: 700;
+  padding: 3px 9px; border-radius: 10px;
+  display: flex; align-items: center; gap: 4px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.wiz-teacher-status.assigned {
+  background: rgba(16,185,129,.12); color: #10b981;
+}
+.wiz-teacher-status.pending {
+  background: rgba(245,158,11,.12); color: #f59e0b;
+}
+
+/* ── Result stat boxes ── */
+.wiz-result-stat {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 28px; border-radius: var(--r-xl); gap: 4px;
+  min-width: 110px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CLASS CARDS — list view
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.class-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 18px;
+  transition: border-color .17s, box-shadow .17s, transform .14s;
+}
+.class-card:hover {
+  border-color: rgba(41,82,163,.25);
+  box-shadow: 0 4px 18px rgba(0,0,0,.08);
+  transform: translateY(-2px);
+}
+
+.class-card-top {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 12px;
+}
+
+.class-avatar {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800;
+  font-size: 14px; color: #fff; flex-shrink: 0;
+}
+
+.class-name {
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 800; color: var(--text);
+  margin-bottom: 3px;
+}
+.class-meta { font-size: 12px; color: var(--muted); }
+
+.class-pending-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; padding: 3px 9px;
+  border-radius: 10px; white-space: nowrap; margin-left: auto;
+  background: rgba(245,158,11,.12); color: #f59e0b;
+  border: 1px solid rgba(245,158,11,.25);
+}
+
+.class-alloc-pills {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-top: 4px;
+}
+
+.class-alloc-pill {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 10px;
+  border: 1.5px solid transparent;
+}
+.class-alloc-pill.pending {
+  background: rgba(245,158,11,.1);
+  color: #f59e0b;
+  border-color: rgba(245,158,11,.3);
+}
+
+.class-actions {
+  display: flex; gap: 7px; margin-top: 14px;
+  padding-top: 12px; border-top: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — all pages, all breakpoints
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1200px — large tablets/small laptops ── */
+@media (max-width: 1200px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .dash-stats { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── 1024px ── */
+@media (max-width: 1024px) {
+  .teacher-layout { grid-template-columns: 1fr; }
+  .teacher-form-panel { position: static; }
+  .exam-tpl-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .exam-gen-grid  { grid-template-columns: 1fr; }
+  .exam-gen-options { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── 900px — tablets ── */
+@media (max-width: 900px) {
+  .dash-stats { grid-template-columns: repeat(2, 1fr); }
+  .wizard-form-grid { grid-template-columns: 1fr; }
+  .wiz-new-subject-fields { grid-template-columns: 1fr; }
+  .exam-create-grid { grid-template-columns: 1fr; }
+  .exam-tpl-apply-row { grid-template-columns: 1fr; }
+  .settings-layout { gap: 16px; }
+  .exam-papers-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .exam-session-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .class-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .exam-page-header { flex-direction: column; align-items: flex-start; }
+  .exam-header-actions { width: 100%; flex-wrap: wrap; }
+}
+
+/* ── 768px — mobile landscape / small tablets ── */
+@media (max-width: 768px) {
+  /* sidebar handled by sidebar-open class */
+  .app-main { margin-left: 0 !important; width: 100%; }
+
+  .page-header {
+    flex-direction: column; align-items: flex-start; gap: 12px;
+  }
+  .page-header .btn { width: 100%; justify-content: center; }
+
+  .dash-hero { flex-direction: column; align-items: flex-start; }
+  .dash-hero-actions { width: 100%; }
+  .dash-hero-actions .btn { flex: 1; }
+
+  .dash-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .dash-stat-card { padding: 16px 14px; }
+  .dash-stat-value { font-size: 28px; }
+
+  .dash-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .dash-banner .btn { align-self: flex-end; }
+
+  .class-grid { grid-template-columns: 1fr; }
+
+  .wizard-modal { max-width: 100%; max-height: 100vh;
+    border-radius: 0; margin: 0; height: 100%; }
+  .wizard-backdrop { padding: 0; align-items: flex-end; }
+  .wizard-steps { padding: 12px 16px; }
+  .wizard-step-label { display: none; }
+  .wizard-body { padding: 16px; }
+  .wizard-header { padding: 16px 16px 12px; }
+  .wizard-footer { flex-direction: column; }
+  .wizard-footer .btn { width: 100%; justify-content: center; }
+
+  .wiz-subject-grid { grid-template-columns: repeat(2, 1fr); }
+  .wiz-teacher-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .wiz-teacher-subject { min-width: unset; }
+  .wiz-teacher-select { width: 100%; }
+
+  .teacher-card { flex-direction: column; align-items: flex-start; }
+  .teacher-actions { width: 100%; justify-content: flex-end; }
+
+  .exam-gen-options { grid-template-columns: 1fr; }
+  .exam-modal { padding: 16px; }
+
+  .settings-badge-upload { flex-direction: column; }
+  .settings-pdf-themes { gap: 6px; }
+  .settings-pdf-theme { min-width: 60px; padding: 8px; }
+
+  .ai-panel { width: calc(100vw - 16px); right: 8px; bottom: 76px; }
+  .ai-fab   { bottom: 16px; right: 16px; width: 46px; height: 46px; }
+
+  .topbar { padding: 0 14px 0 56px; }
+}
+
+/* ── 480px — small phones ── */
+@media (max-width: 480px) {
+  .dash-stats { grid-template-columns: 1fr; }
+  .dash-stat-card { padding: 14px 12px; }
+
+  .page-title { font-size: 20px; }
+
+  .exam-session-grid { grid-template-columns: 1fr; }
+  .exam-papers-grid  { grid-template-columns: 1fr; }
+  .exam-grid-day-head { min-width: 110px; font-size: 11px; }
+
+  .wiz-subject-grid { grid-template-columns: 1fr; }
+  .wizard-form-grid { grid-template-columns: 1fr; }
+
+  .topbar-user-info { display: none; }
+  .topbar-chevron   { display: none; }
+
+  .teacher-form-row { grid-template-columns: 1fr; }
+  .exam-create-grid { grid-template-columns: 1fr; }
+
+  .dash-grid { gap: 14px; }
+  .dash-card { padding: 16px 14px; }
+}
+
+/* ── Landscape phone ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .wizard-modal { max-height: 100vh; border-radius: 0; }
+  .wizard-backdrop { padding: 0; }
+  .wizard-steps { padding: 8px 16px; }
+  .wizard-step-dot { width: 24px; height: 24px; }
+  .wizard-body { padding: 12px 16px; }
+}
+
+/* ── Touch devices — better tap targets ── */
+@media (hover: none) and (pointer: coarse) {
+  .btn, .nav-link, .teacher-card, .class-card,
+  .exam-session-card, .dash-action-btn, .wiz-subject-card {
+    min-height: 44px;
+  }
+  .wiz-teacher-select, .wiz-input, .wiz-select,
+  .teacher-form-input, .teacher-form-select {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+}

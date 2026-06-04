@@ -195,6 +195,18 @@ export const holidaysAPI = {
   checkDate: (countryCode, date) => api.get(`/holidays/check-date/${countryCode}/${date}`),
 }
 
+
+// ── Allocations ───────────────────────────────────────────────────────────────
+export const allocationsAPI = {
+  list:            (params)        => api.get('/allocations', { params }),
+  pending:         ()              => api.get('/allocations/pending'),
+  stats:           ()              => api.get('/allocations/stats'),
+  forClass:        (classId)       => api.get(`/classes/${classId}/allocations`),
+  saveForClass:    (classId, body) => api.post(`/classes/${classId}/allocations`, body),
+  update:          (id, body)      => api.put(`/allocations/${id}`, body),
+  delete:          (id)            => api.delete(`/allocations/${id}`),
+}
+
 // ── Templates ─────────────────────────────────────────────────────────────────
 export const templatesAPI = {
   timetableTemplates: ()           => api.get('/templates/timetable'),
