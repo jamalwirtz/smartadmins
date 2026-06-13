@@ -92,7 +92,8 @@ class ClassSection(Base):
     name                = Column(String(40),  nullable=False)
     grade_level         = Column(String(20),  nullable=False)
     max_subjects_per_day= Column(Integer, default=8)
-    stream              = Column(String(40),  nullable=True)   # e.g. "Blue", "Science"
+    stream              = Column(String(40),  nullable=True)
+    education_system_id = Column(String(36), ForeignKey('education_systems.id', ondelete='SET NULL'), nullable=True)   # e.g. "Blue", "Science"
     capacity            = Column(Integer,     default=40)      # max students
     created_at          = Column(DateTime(timezone=True), default=_now)
 
@@ -215,6 +216,7 @@ class SchoolSettings(Base):
     country_code  = Column(String(4),   default="ZA")
     badge_data    = Column(Text,        nullable=True)   # base64-encoded logo image
     badge_mime    = Column(String(30),  nullable=True)   # "image/png" | "image/jpeg"
+    badge_position= Column(String(20),  default="top-left")  # top-left|top-center|top-right
     # Timetable time config
     start_time    = Column(String(5),   default="08:00")  # "08:00"
     period_minutes= Column(Integer,     default=45)
@@ -269,3 +271,53 @@ class ClassAllocation(Base):
     class_section = relationship("ClassSection", backref="allocations")
     subject       = relationship("Subject")
     teacher       = relationship("Teacher")
+
+
+# ── Education System ───────────────────────────────────────────────────────────
+class EducationSystem(Base):
+    """Cambridge, UNEB, IB, CBC, Custom — filters classes, subjects, papers."""
+    __tablename__ = "education_systems"
+    id      = Column(String(36), primary_key=True, default=_uuid)
+    name    = Column(String(80),  nullable=False, unique=True)  # "Cambridge CAIE"
+    code    = Column(String(20),  nullable=False, unique=True)  # "CAIE"
+    levels  = Column(String(200), nullable=True)   # "Form 1,Form 2,Form 3,Form 4,Form 5,Form 6"
+    is_custom = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
+# ── Room ──────────────────────────────────────────────────────────────────────
+class Room(Base):
+    """Exam/class rooms with capacity and equipment info."""
+    __tablename__ = "rooms"
+    id        = Column(String(36), primary_key=True, default=_uuid)
+    name      = Column(String(80),  nullable=False)
+    building  = Column(String(80),  nullable=True)
+    capacity  = Column(Integer,     default=30)
+    equipment = Column(String(300), nullable=True)  # "projector,lab bench,computers"
+    is_active = Column(Boolean,     default=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
+# ── Supervisor ────────────────────────────────────────────────────────────────
+class Supervisor(Base):
+    """
+    Supervisors / invigilators for exam sessions.
+    Can be teachers, residential assistants, external affiliates, or admins.
+    Separate from Teacher model — any supervisor can invigilate any exam.
+    """
+    __tablename__ = "supervisors"
+    id           = Column(String(36), primary_key=True, default=_uuid)
+    name         = Column(String(80),  nullable=False)
+    role         = Column(String(40),  default="teacher")  # teacher|ra|external|admin
+    department   = Column(String(80),  nullable=True)
+    email        = Column(String(120), nullable=True)
+    phone        = Column(String(40),  nullable=True)
+    max_sessions = Column(Integer,     default=3)    # max per day
+    availability = Column(String(200), nullable=True)  # "Monday,Tuesday,Wednesday"
+    is_active    = Column(Boolean,     default=True)
+    created_at   = Column(DateTime(timezone=True), default=_now)
+
+    exam_slots = relationship("ExamSlot",
+                              foreign_keys="ExamSlot.invigilator_id",
+                              backref="supervisor_rel",
+                              overlaps="invigilator")

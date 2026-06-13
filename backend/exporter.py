@@ -108,7 +108,7 @@ class PDFExporter:
             pass
         return labels
 
-    def _header(self, story, title: str, db=None):
+    def _header(self, story, title: str, db=None, badge_position='top-left'):
         import base64 as _b64
         from reportlab.platypus import HRFlowable
         school = self._school_info(db)
