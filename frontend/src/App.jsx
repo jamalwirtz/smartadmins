@@ -7,6 +7,7 @@ import { useGlobalWS } from './hooks/useWebSocket'
 import toast from 'react-hot-toast'
 
 import Home        from './pages/Home'
+import ScheduleSettings from './pages/ScheduleSettings'
 import Login       from './pages/Login'
 import Signup      from './pages/Signup'
 import Dashboard   from './pages/Dashboard'
@@ -20,7 +21,7 @@ import Exams       from './pages/Exams'
 import Walkthrough from './components/Walkthrough'
 
 import {
-  LayoutDashboard, Users, BookOpen, School, CalendarDays, UserCheck,
+  LayoutDashboard, Users, BookOpen, School, CalendarDays, UserCheck, Clock,
   LogOut, Sun, Moon, Settings as SettingsIcon, ChevronDown, Bell,
   HelpCircle, GraduationCap, Menu, X as XIcon
 } from 'lucide-react'
@@ -41,7 +42,8 @@ const PAGE_TITLES = {
   '/timetable':    { label: 'Timetable',    icon: <CalendarDays size={15}/> },
   '/exams':        { label: 'Exams',        icon: <GraduationCap size={15}/> },
   '/teacher-view': { label: 'Teacher View', icon: <UserCheck size={15}/> },
-  '/settings':     { label: 'Settings',     icon: <SettingsIcon size={15}/> },
+  '/settings':          { label: 'Settings',          icon: <SettingsIcon size={15}/> },
+  '/schedule-settings': { label: 'Schedule Settings',  icon: <Clock size={15}/> },
 }
 
 // ── Nav link ──────────────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ function GlobalWSListener() {
 }
 
 // ── User dropdown ─────────────────────────────────────────────────────────────
-function UserDropdown({ user, onLogout }) {
+function UserDropdown({ user, onLogout, photoUrl }) {
   const navigate  = useNavigate()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -81,7 +83,11 @@ function UserDropdown({ user, onLogout }) {
   return (
     <div className="topbar-user-wrap" ref={ref}>
       <button className="topbar-user-btn" onClick={() => setOpen(o => !o)}>
-        <div className="topbar-avatar">{initials}</div>
+        <div className="topbar-avatar" style={photoUrl?{padding:0,overflow:'hidden'}:{}}>
+          {photoUrl
+            ? <img src={photoUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/>
+            : initials}
+        </div>
         <div className="topbar-user-info">
           <span className="topbar-user-name">{user?.username || 'Admin'}</span>
           <span className="topbar-user-role">Administrator</span>
@@ -124,7 +130,7 @@ function UserDropdown({ user, onLogout }) {
 }
 
 // ── Topbar ────────────────────────────────────────────────────────────────────
-function Topbar({ user, onLogout, onMenuClick }) {
+function Topbar({ user, onLogout, onMenuClick, photoUrl }) {
   const location = useLocation()
   const { theme, toggle: toggleTheme } = useTheme()
   const pageInfo = PAGE_TITLES[location.pathname] || { label: 'Smart Admin', icon: null }
@@ -155,14 +161,14 @@ function Topbar({ user, onLogout, onMenuClick }) {
           onClick={() => toast('Notifications coming soon', { icon:'🔔' })}>
           <Bell size={16}/>
         </button>
-        <UserDropdown user={user} onLogout={onLogout}/>
+        <UserDropdown user={user} onLogout={onLogout} photoUrl={photoUrl}/>
       </div>
     </motion.header>
   )
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ user, onLogout, onClose }) {
+function Sidebar({ user, onLogout, onClose, photoUrl }) {
   const navigate = useNavigate()
   const closeOnMobile = () => {
     if (window.innerWidth <= 768) onClose?.()
@@ -198,14 +204,19 @@ function Sidebar({ user, onLogout, onClose }) {
         <NavItem to="/teacher-view" icon={<UserCheck size={16}/>}      label="Teacher View" onClick={closeOnMobile}/>
 
         <div className="nav-section-label">Account</div>
-        <NavItem to="/settings"     icon={<SettingsIcon size={16}/>}   label="Settings"     onClick={closeOnMobile}/>
+        <NavItem to="/settings"          icon={<SettingsIcon size={16}/>}   label="Settings"     onClick={closeOnMobile}/>
+        <NavItem to="/schedule-settings" icon={<Clock size={16}/>}            label="Schedule Config" onClick={closeOnMobile}/>
       </nav>
 
       <div className="sidebar-footer">
         <div className="sidebar-user sidebar-user-clickable"
           onClick={() => { navigate('/settings'); closeOnMobile() }}
           title="Open settings">
-          <div className="sidebar-avatar">{(user?.username||'AD').slice(0,2).toUpperCase()}</div>
+          <div className="sidebar-avatar" style={photoUrl?{padding:0,overflow:'hidden'}:{}}>
+            {photoUrl
+              ? <img src={photoUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/>
+              : (user?.username||'AD').slice(0,2).toUpperCase()}
+          </div>
           <div>
             <div className="sidebar-username">{user?.username}</div>
             <div className="sidebar-role">Administrator</div>
@@ -225,7 +236,7 @@ function Sidebar({ user, onLogout, onClose }) {
 
 // ── Protected layout (with mobile sidebar state here where it belongs) ────────
 function ProtectedLayout({ children }) {
-  const { user, loading, logout } = useAuth()
+  const { user, loading, logout, photoUrl } = useAuth()
   const navigate    = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -252,10 +263,10 @@ function ProtectedLayout({ children }) {
         )}
       </AnimatePresence>
 
-      <Sidebar user={user} onLogout={handleLogout} onClose={() => setSidebarOpen(false)}/>
+      <Sidebar user={user} onLogout={handleLogout} onClose={() => setSidebarOpen(false)} photoUrl={photoUrl}/>
 
       <div className="app-main">
-        <Topbar user={user} onLogout={handleLogout} onMenuClick={() => setSidebarOpen(o => !o)}/>
+        <Topbar user={user} onLogout={handleLogout} onMenuClick={() => setSidebarOpen(o => !o)} photoUrl={photoUrl}/>
         <div className="main-content">{children}</div>
       </div>
     </div>
@@ -312,6 +323,7 @@ export default function App() {
                 <Route path="/exams"        element={<motion.div key="ex"    {...pageVariants}><Exams/></motion.div>}/>
                 <Route path="/teacher-view" element={<motion.div key="tv"    {...pageVariants}><TeacherView/></motion.div>}/>
                 <Route path="/settings"     element={<motion.div key="sett"  {...pageVariants}><Settings/></motion.div>}/>
+                <Route path="/schedule-settings" element={<motion.div key="schset" {...pageVariants}><ScheduleSettings/></motion.div>}/>
                 <Route path="*"             element={<Navigate to="/dashboard"/>}/>
               </Routes>
             </AnimatePresence>

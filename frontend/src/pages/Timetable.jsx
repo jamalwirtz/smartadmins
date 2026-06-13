@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, closestCenter,
   useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
-import { schedulesAPI, exportAPI } from '../api/client'
+import { schedulesAPI, exportAPI, schoolAPI } from '../api/client'
 import { useDraftWS } from '../hooks/useWebSocket'
 import toast from 'react-hot-toast'
 import {
@@ -262,8 +262,11 @@ export default function Timetable() {
   const [classes, setClasses] = useState([])
   const [generating, setGenerating] = useState(false)
   const [reshuffling, setReshuffling] = useState(false)
-  const [validating, setValidating] = useState(false)
-  const [validation, setValidation] = useState(null)
+  const [validating,    setValidating]    = useState(false)
+  const [validation,    setValidation]    = useState(null)
+  const [showPdfPanel,  setShowPdfPanel]  = useState(false)
+  const [schoolCfg,     setSchoolCfg]     = useState(null)
+  const [savingPdf,     setSavingPdf]     = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
 
   const loadDrafts = useCallback(() =>
@@ -288,6 +291,9 @@ export default function Timetable() {
   }, [])
 
   useEffect(() => { loadDrafts() }, [loadDrafts])
+  useEffect(() => {
+    schoolAPI.getSettings().then(r => setSchoolCfg(r.data)).catch(() => {})
+  }, [])
   useEffect(() => { if (selectedDraftId) loadDetail(selectedDraftId) }, [selectedDraftId, loadDetail])
 
   // Real-time WebSocket
@@ -359,6 +365,16 @@ export default function Timetable() {
     } finally { setValidating(false) }
   }
 
+  const savePdfCfg = async (updates) => {
+    setSavingPdf(true)
+    try {
+      await schoolAPI.updateSettings(updates)
+      setSchoolCfg(c => ({ ...c, ...updates }))
+      toast.success('PDF settings saved ✅')
+    } catch { toast.error('Save failed') }
+    finally { setSavingPdf(false) }
+  }
+
   const downloadPdf = async () => {
     if (!selectedDraftId) return
     try {
@@ -409,6 +425,10 @@ export default function Timetable() {
             </button>
             <button className="btn btn-teal btn-sm" onClick={downloadPdf}>
               <Download size={13} /> PDF
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowPdfPanel(p => !p)}
+              title="PDF & export settings" style={{padding:'5px 8px'}}>
+              <Palette size={13} />
             </button>
           </>}
         </div>
@@ -533,6 +553,76 @@ export default function Timetable() {
           </motion.div>
         )}
       </div>
+      {/* ── PDF & Theme panel ── */}
+      <AnimatePresence>
+        {showPdfPanel && schoolCfg && (
+          <motion.div className="tt-pdf-panel"
+            initial={{opacity:0,x:320}} animate={{opacity:1,x:0}} exit={{opacity:0,x:320}}>
+            <div className="tt-pdf-panel-header">
+              <span className="tt-pdf-panel-title">PDF & Export Settings</span>
+              <button className="wizard-close" onClick={() => setShowPdfPanel(false)}>
+                <X size={15}/>
+              </button>
+            </div>
+
+            <div className="tt-pdf-panel-body">
+              <div className="tt-pdf-section-label">Colour Theme</div>
+              <div className="tt-pdf-themes">
+                {[
+                  {id:'navy', label:'Navy',  colors:['#1A237E','#E8EAF6','#9FA8DA']},
+                  {id:'green',label:'Green', colors:['#1B5E20','#E8F5E9','#A5D6A7']},
+                  {id:'amber',label:'Amber', colors:['#E65100','#FFF3E0','#FFCC80']},
+                  {id:'rose', label:'Rose',  colors:['#880E4F','#FCE4EC','#F48FB1']},
+                  {id:'slate',label:'Slate', colors:['#263238','#ECEFF1','#B0BEC5']},
+                ].map(t => (
+                  <button key={t.id}
+                    className={`tt-pdf-theme-btn${schoolCfg.timetable_theme===t.id?' active':''}`}
+                    onClick={() => savePdfCfg({ timetable_theme: t.id })}>
+                    <div className="tt-pdf-swatches">
+                      {t.colors.map((c,i) => <div key={i} style={{background:c,flex:1}}/>)}
+                    </div>
+                    <span>{t.label}</span>
+                    {schoolCfg.timetable_theme===t.id && <Check size={10} style={{marginLeft:'auto',color:'var(--amber)'}}/>}
+                  </button>
+                ))}
+              </div>
+
+              <div className="tt-pdf-section-label" style={{marginTop:16}}>Badge Position on PDF</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {['top-left','top-center','top-right'].map(pos => (
+                  <button key={pos}
+                    className={`tt-pdf-pos-btn${schoolCfg.badge_position===pos?' active':''}`}
+                    onClick={() => savePdfCfg({ badge_position: pos })}>
+                    {pos.replace('top-','').replace('-',' ')}
+                    {schoolCfg.badge_position===pos && <Check size={10}/>}
+                  </button>
+                ))}
+              </div>
+
+              <div className="tt-pdf-section-label" style={{marginTop:16}}>Orientation</div>
+              <div style={{display:'flex',gap:8}}>
+                {[{id:'horizontal',label:'Horizontal'},{id:'vertical',label:'Vertical'}].map(o => (
+                  <button key={o.id}
+                    className={`tt-pdf-pos-btn${schoolCfg.timetable_orientation===o.id?' active':''}`}
+                    onClick={() => savePdfCfg({ timetable_orientation: o.id })}>
+                    {o.label}
+                    {schoolCfg.timetable_orientation===o.id && <Check size={10}/>}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{marginTop:20,display:'flex',gap:8}}>
+                <button className="btn btn-accent" style={{flex:1}} onClick={downloadPdf}
+                  disabled={!selectedDraftId}>
+                  <Download size={13}/> Download PDF
+                </button>
+              </div>
+              {savingPdf && <div style={{fontSize:11,color:'var(--muted)',textAlign:'center',marginTop:6}}>Saving…</div>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AIAssistant context="timetable" />
     </>
   )

@@ -25,6 +25,13 @@ export function AuthProvider({ children }) {
     const me = await authAPI.me()
     setUser(me.data)
     window.dispatchEvent(new CustomEvent('sstg_logged_in'))
+    // Load profile photo globally so topbar shows it immediately
+    try {
+      const { data: prof } = await import('../api/client').then(m => m.profileAPI.get())
+      if (prof.has_photo && prof.photo_url) {
+        setPhotoUrl(prof.photo_url + '?t=' + Date.now())
+      }
+    } catch { /* photo is optional */ }
     return me.data
   }
 
@@ -34,7 +41,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, photoUrl, setPhotoUrl }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   classesAPI, subjectsAPI, teachersAPI, allocationsAPI
@@ -43,6 +44,7 @@ function StepBar({ current }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Classes() {
+  const navigate = useNavigate()
   const [classes,   setClasses]   = useState([])
   const [subjects,  setSubjects]  = useState([])
   const [teachers,  setTeachers]  = useState([])
@@ -76,6 +78,11 @@ export default function Classes() {
 
   // Search
   const [classSearch, setClassSearch] = useState('')
+  // Inline teacher creation (step 3)
+  const [addingTeacher,   setAddingTeacher]   = useState(false)
+  const [newTeacherName,  setNewTeacherName]  = useState('')
+  const [newTeacherEmail, setNewTeacherEmail] = useState('')
+  const [creatingTeacher, setCreatingTeacher] = useState(false)
 
   // ── Data loading ─────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -423,15 +430,57 @@ export default function Classes() {
                               </div>
                             </div>
                             <ArrowRight size={14} style={{color:'var(--muted)',flexShrink:0}}/>
-                            <select
-                              className="wiz-teacher-select"
-                              value={teacherMap[sid]||''}
-                              onChange={e=>setTeacherMap(m=>({...m,[sid]:e.target.value}))}>
-                              <option value="">— Leave Blank (Pending) —</option>
-                              {teachers.map(t=>(
-                                <option key={t.id} value={t.id}>{t.name}</option>
-                              ))}
-                            </select>
+                            <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                              <select
+                                className="wiz-teacher-select"
+                                value={teacherMap[sid]||''}
+                                onChange={e=>setTeacherMap(m=>({...m,[sid]:e.target.value}))}>
+                                <option value="">— Leave Blank (Pending) —</option>
+                                {/* Teachers who teach this subject */}
+                                {teachers.filter(t=>(t.subject_ids||[]).includes(sid)).length > 0 && (
+                                  <optgroup label="Assigned to this subject">
+                                    {teachers.filter(t=>(t.subject_ids||[]).includes(sid))
+                                      .map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                                  </optgroup>
+                                )}
+                                {/* All other teachers as fallback */}
+                                {teachers.filter(t=>!(t.subject_ids||[]).includes(sid)).length > 0 && (
+                                  <optgroup label="Other teachers">
+                                    {teachers.filter(t=>!(t.subject_ids||[]).includes(sid))
+                                      .map(t=><option key={t.id} value={t.id}>{t.name} ⚠</option>)}
+                                  </optgroup>
+                                )}
+                              </select>
+                              {/* Inline teacher creation */}
+                              {addingTeacher === sid ? (
+                                <div style={{display:'flex',flexDirection:'column',gap:6,
+                                  padding:10,background:'var(--surface-2)',borderRadius:8,
+                                  border:'1px solid var(--border)'}}>
+                                  <input className="wiz-input" value={newTeacherName} autoFocus
+                                    onChange={e=>setNewTeacherName(e.target.value)}
+                                    placeholder="Teacher full name *"/>
+                                  <input className="wiz-input" value={newTeacherEmail}
+                                    onChange={e=>setNewTeacherEmail(e.target.value)}
+                                    placeholder="Email (optional)"/>
+                                  <div style={{display:'flex',gap:6}}>
+                                    <button className="btn btn-accent btn-sm" style={{flex:1}}
+                                      disabled={creatingTeacher}
+                                      onClick={()=>createTeacherInline(sid)}>
+                                      {creatingTeacher?'Creating…':<><Check size={12}/>Create &amp; Assign</>}
+                                    </button>
+                                    <button className="btn btn-secondary btn-sm"
+                                      onClick={()=>{setAddingTeacher(false);setNewTeacherName('');setNewTeacherEmail('')}}>
+                                      <X size={12}/>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button className="wiz-add-btn" style={{marginTop:0,padding:'5px 8px',fontSize:11}}
+                                  onClick={()=>setAddingTeacher(sid)}>
+                                  <Plus size={11}/> Create New Teacher
+                                </button>
+                              )}
+                            </div>
                             <div className={`wiz-teacher-status${hasTeacher?' assigned':' pending'}`}>
                               {hasTeacher
                                 ? <><CheckCircle size={12}/> Assigned</>
@@ -602,8 +651,9 @@ export default function Classes() {
                   <button className="btn btn-sm btn-secondary" onClick={()=>openEdit(cls)}>
                     <Pencil size={13}/> Edit
                   </button>
-                  <button className="btn btn-sm btn-secondary" onClick={()=>openEdit(cls)}>
-                    <Users size={13}/> Allocate
+                  <button className="btn btn-sm btn-secondary"
+                    onClick={()=>navigate('/teachers', { state: { classId: cls.id, className: cls.name } })}>
+                    <Users size={13}/> Assign Teachers
                   </button>
                   <button className="btn btn-sm"
                     style={{marginLeft:'auto',color:'var(--red,#ef4444)',

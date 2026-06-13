@@ -3584,7 +3584,7 @@ input::placeholder, textarea::placeholder {
 }
 
 .wizard-title {
-  font-family: var(--font-display);
+  font-family: "Nunito", sans-serif;
   font-size: 18px; font-weight: 800;
   color: var(--text); margin: 0 0 3px;
 }
@@ -3850,14 +3850,14 @@ input::placeholder, textarea::placeholder {
 .class-avatar {
   width: 42px; height: 42px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-display); font-weight: 800;
+  font-family: "Nunito", sans-serif; font-weight: 700;
   font-size: 14px; color: #fff; flex-shrink: 0;
 }
 
 .class-name {
-  font-family: var(--font-display);
-  font-size: 15px; font-weight: 800; color: var(--text);
-  margin-bottom: 3px;
+  font-family: "Nunito", sans-serif;
+  font-size: 15px; font-weight: 700; color: var(--text);
+  margin-bottom: 3px; letter-spacing: -.01em;
 }
 .class-meta { font-size: 12px; color: var(--muted); }
 
@@ -4021,4 +4021,299 @@ input::placeholder, textarea::placeholder {
   .teacher-form-input, .teacher-form-select {
     font-size: 16px; /* prevents iOS zoom on focus */
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCHEDULE SETTINGS PAGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sched-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.sched-config-col { display: flex; flex-direction: column; gap: 16px; }
+.sched-preview-col { }
+
+.sched-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sched-section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 13px; font-weight: 800;
+  color: var(--text);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.sched-field { display: flex; flex-direction: column; gap: 4px; }
+
+.sched-label {
+  font-size: 12px; font-weight: 700; color: var(--text);
+}
+
+.sched-hint {
+  font-size: 11px; color: var(--muted);
+}
+
+.sched-control { margin-top: 2px; }
+
+.sched-num {
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 7px 10px;
+  font-size: 14px;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  width: 80px;
+  outline: none;
+  transition: border-color .15s;
+}
+.sched-num:focus { border-color: rgba(41,82,163,.5); }
+
+.sched-time {
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 7px 12px;
+  font-size: 14px;
+  font-family: var(--font-numeric);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+}
+.sched-time:focus { border-color: rgba(41,82,163,.5); }
+
+.sched-unit {
+  font-size: 12px; color: var(--muted); font-weight: 600;
+}
+
+.sched-days-grid {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+
+.sched-day-btn {
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  transition: all .15s;
+}
+.sched-day-btn.active {
+  border-color: var(--amber);
+  background: rgba(245,158,11,.12);
+  color: var(--amber);
+}
+.sched-day-btn:hover:not(.active) {
+  border-color: var(--border-2); color: var(--text);
+}
+
+/* ── Schedule preview ── */
+.sched-preview-list {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 460px; overflow-y: auto;
+}
+
+.sched-preview-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.sched-preview-row.period  { background: var(--surface-2); }
+.sched-preview-row.break   { background: rgba(245,158,11,.07); border-color: rgba(245,158,11,.25); }
+.sched-preview-row.lunch   { background: rgba(16,185,129,.07); border-color: rgba(16,185,129,.25); }
+
+.sched-preview-time {
+  font-family: var(--font-numeric);
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  color: var(--muted); min-width: 100px; flex-shrink: 0;
+}
+
+.sched-preview-label {
+  font-size: 12px; font-weight: 700; color: var(--text); flex: 1;
+}
+
+.sched-preview-type-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.sched-preview-type-dot.period { background: var(--border-2); }
+.sched-preview-type-dot.break  { background: #f59e0b; }
+.sched-preview-type-dot.lunch  { background: #10b981; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TIMETABLE PDF PANEL (slide-in from right)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tt-pdf-panel {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 300px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 32px rgba(0,0,0,.15);
+  z-index: 100;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.tt-pdf-panel-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.tt-pdf-panel-title {
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px; font-weight: 800; color: var(--text);
+}
+
+.tt-pdf-panel-body {
+  flex: 1; overflow-y: auto;
+  padding: 18px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.tt-pdf-section-label {
+  font-size: 10px; font-weight: 800;
+  color: var(--muted); text-transform: uppercase;
+  letter-spacing: .7px; margin-bottom: 6px;
+}
+
+.tt-pdf-themes {
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+.tt-pdf-theme-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-lg);
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color .14s;
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.tt-pdf-theme-btn:hover { border-color: var(--border-2); }
+.tt-pdf-theme-btn.active {
+  border-color: var(--amber);
+  background: rgba(245,158,11,.07);
+}
+
+.tt-pdf-swatches {
+  display: flex; width: 42px; height: 18px;
+  border-radius: 4px; overflow: hidden;
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+
+.tt-pdf-pos-btn {
+  flex: 1; padding: 6px 10px;
+  border-radius: var(--r-lg);
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  color: var(--muted);
+  display: flex; align-items: center;
+  justify-content: center; gap: 5px;
+  text-transform: capitalize;
+  transition: all .14s;
+}
+.tt-pdf-pos-btn:hover { border-color: var(--border-2); color: var(--text); }
+.tt-pdf-pos-btn.active {
+  border-color: var(--amber);
+  background: rgba(245,158,11,.1);
+  color: var(--amber);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXAM SLOT CARD — supervisor + room inline assign
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.exam-slot-assign-row {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 3px;
+}
+
+.exam-slot-assign-select,
+.exam-slot-assign-input {
+  flex: 1; min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 10px; color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+.exam-slot-assign-select:focus,
+.exam-slot-assign-input:focus { border-color: var(--amber); }
+
+.exam-slot-save-btn {
+  display: flex; align-items: center; gap: 3px;
+  background: rgba(16,185,129,.15);
+  border: 1px solid rgba(16,185,129,.3);
+  color: #10b981;
+  border-radius: 5px;
+  padding: 3px 7px; font-size: 10px;
+  font-weight: 700; cursor: pointer;
+  transition: background .12s;
+}
+.exam-slot-save-btn:hover { background: rgba(16,185,129,.25); }
+
+.exam-slot-cancel-btn {
+  display: flex; align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 5px; cursor: pointer;
+  color: var(--muted);
+  transition: background .12s;
+}
+.exam-slot-cancel-btn:hover { background: var(--border); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — Schedule Settings + PDF Panel
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  .sched-layout {
+    grid-template-columns: 1fr;
+  }
+  .sched-preview-col {
+    order: -1;
+  }
+  .sched-preview-list { max-height: 220px; }
+}
+
+@media (max-width: 768px) {
+  .tt-pdf-panel {
+    width: 100%;
+    top: auto;
+    height: 70vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 32px rgba(0,0,0,.15);
+  }
+  .sched-days-grid { gap: 5px; }
+  .sched-day-btn { padding: 6px 10px; font-size: 11px; }
 }

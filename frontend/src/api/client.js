@@ -214,6 +214,31 @@ export const templatesAPI = {
   applyExamTemplate:  (data)       => api.post('/templates/exam/apply', data),
 }
 
+
+// ── Rooms ─────────────────────────────────────────────────────────────────────
+export const roomsAPI = {
+  list:   ()         => api.get('/rooms'),
+  create: (data)     => api.post('/rooms', data),
+  update: (id, data) => api.put(`/rooms/${id}`, data),
+  delete: (id)       => api.delete(`/rooms/${id}`),
+}
+
+// ── Supervisors ───────────────────────────────────────────────────────────────
+export const supervisorsAPI = {
+  list:       ()         => api.get('/supervisors'),
+  available:  (day)      => api.get('/supervisors/availability', { params: { day } }),
+  create:     (data)     => api.post('/supervisors', data),
+  update:     (id, data) => api.put(`/supervisors/${id}`, data),
+  delete:     (id)       => api.delete(`/supervisors/${id}`),
+}
+
+// ── Education Systems ─────────────────────────────────────────────────────────
+export const educationSystemsAPI = {
+  list:   ()     => api.get('/education-systems'),
+  create: (data) => api.post('/education-systems', data),
+  delete: (id)   => api.delete(`/education-systems/${id}`),
+}
+
 // ── Export ────────────────────────────────────────────────────────────────────
 export const exportAPI = {
   draftPdf:    (draft_id) =>

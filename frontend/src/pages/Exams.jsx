@@ -6,11 +6,11 @@ import {
   BookOpen, Clock, CheckCircle2, RefreshCw, Play,
   Download, FileSpreadsheet, FileText, Trash2,
   Layers, ChevronDown, AlertTriangle, Info,
-  GraduationCap, FlaskConical, Zap
+  GraduationCap, FlaskConical, Zap, User, MapPin, Pencil
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { examsAPI, subjectsAPI, classesAPI, teachersAPI,
-         exportAPI, templatesAPI } from '../api/client'
+         exportAPI, templatesAPI, supervisorsAPI, roomsAPI } from '../api/client'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday']
@@ -73,6 +73,9 @@ export default function Exams() {
   const [subjects,   setSubjects]   = useState([])
   const [classes,    setClasses]    = useState([])
   const [papersData, setPapersData] = useState([])
+  const [supervisors, setSupervisors] = useState([])
+  const [rooms,       setRooms]       = useState([])
+  const [editingSlot, setEditingSlot] = useState(null)  // slot being assigned
   const [examTpls,   setExamTpls]   = useState([])
   const [ttTpls,     setTtTpls]     = useState([])
 
@@ -119,12 +122,15 @@ export default function Exams() {
 
   const loadSupport = useCallback(async () => {
     try {
-      const [s, c, p, et] = await Promise.all([
+      const [s, c, p, et, sv, rm] = await Promise.all([
         subjectsAPI.list(), classesAPI.list(),
         examsAPI.allPapers(), templatesAPI.examTemplates(),
+        supervisorsAPI.list().catch(() => ({ data:[] })),
+        roomsAPI.list().catch(() => ({ data:[] })),
       ])
       setSubjects(s.data); setClasses(c.data)
       setPapersData(p.data); setExamTpls(et.data)
+      setSupervisors(sv.data); setRooms(rm.data)
       setGenForm(f => ({
         ...f,
         subject_ids: s.data.map(x => x.id),
@@ -241,6 +247,14 @@ export default function Exams() {
       await examsAPI.deleteSlot(slotId)
       loadSession(active.id)
     } catch (err) { toast.error(err?.response?.data?.detail || 'Cannot delete locked slot') }
+  }
+
+  const handleAssignSlot = async (slotId, updates) => {
+    try {
+      await examsAPI.updateSlot(slotId, updates)
+      setEditingSlot(null)
+      loadSession(active.id)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Update failed') }
   }
 
   const handleValidate = async () => {
@@ -830,42 +844,96 @@ export default function Exams() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ExamSlotCard({ slot, onLock, onDelete }) {
+function ExamSlotCard({ slot, onLock, onDelete, onAssign, supervisors=[], rooms=[], isEditing, onEditToggle }) {
   const hex = slot.subject_color || '#6366f1'
+  const [supId,  setSupId]  = useState(slot.invigilator_id || '')
+  const [roomVal, setRoomVal] = useState(slot.room || '')
+  const [roomId,  setRoomId]  = useState(slot.room_id || '')
+
   return (
     <motion.div className="exam-slot-card"
       initial={{ opacity:0, scale:.93 }} animate={{ opacity:1, scale:1 }}
-      style={{
-        borderLeft: `3px solid ${hex}`,
-        background: `${hex}14`,
-      }}>
-      <div className="exam-slot-subject"
-        style={{ color: hex }}>
+      style={{ borderLeft:`3px solid ${hex}`, background:`${hex}14` }}>
+      <div className="exam-slot-subject" style={{ color: hex }}>
         {slot.subject_name}
-        {slot.is_practical && (
-          <FlaskConical size={9} style={{ marginLeft:4, opacity:.7 }}/>
-        )}
+        {slot.is_practical && <FlaskConical size={9} style={{ marginLeft:4, opacity:.7 }}/>}
       </div>
       <div className="exam-slot-paper">Paper {slot.paper_number}</div>
       <div className="exam-slot-meta">
         <span>{slot.class_name}</span>
         <span>{slot.duration}min</span>
       </div>
-      {slot.invigilator_name && (
+
+      {/* Supervisor row */}
+      {isEditing ? (
+        <div className="exam-slot-assign-row">
+          <User size={9}/>
+          <select className="exam-slot-assign-select"
+            value={supId} onChange={e => setSupId(e.target.value)}>
+            <option value="">No supervisor</option>
+            {supervisors.map(s => (
+              <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+            ))}
+          </select>
+        </div>
+      ) : slot.invigilator_name ? (
         <div className="exam-slot-invig">👤 {slot.invigilator_name}</div>
+      ) : (
+        <div className="exam-slot-invig" style={{ color:'var(--muted)', fontStyle:'italic' }}>No supervisor</div>
       )}
-      {slot.room && (
+
+      {/* Room row */}
+      {isEditing ? (
+        <div className="exam-slot-assign-row">
+          <MapPin size={9}/>
+          {rooms.length > 0 ? (
+            <select className="exam-slot-assign-select"
+              value={roomId} onChange={e => { setRoomId(e.target.value); setRoomVal('') }}>
+              <option value="">No room</option>
+              {rooms.map(r => (
+                <option key={r.id} value={r.id}>{r.name} (cap:{r.capacity})</option>
+              ))}
+            </select>
+          ) : (
+            <input className="exam-slot-assign-input"
+              value={roomVal} placeholder="Room name…"
+              onChange={e => { setRoomVal(e.target.value); setRoomId('') }}/>
+          )}
+        </div>
+      ) : slot.room ? (
         <div className="exam-slot-room">📍 {slot.room}</div>
+      ) : null}
+
+      {/* Save assignment */}
+      {isEditing && (
+        <div style={{ display:'flex', gap:4, marginTop:4 }}>
+          <button className="exam-slot-save-btn"
+            onClick={() => onAssign(slot.id, {
+              invigilator_id: supId || null,
+              room_id:        roomId || null,
+              room:           roomVal || null,
+            })}>
+            <Check size={10}/> Save
+          </button>
+          <button className="exam-slot-cancel-btn" onClick={onEditToggle}>
+            <X size={10}/>
+          </button>
+        </div>
       )}
+
       <div className="exam-slot-actions">
         <button className={`exam-slot-btn${slot.is_locked ? ' locked' : ''}`}
-          onClick={() => onLock(!slot.is_locked)}
-          title={slot.is_locked ? 'Unlock slot' : 'Lock slot'}>
+          onClick={() => onLock(!slot.is_locked)}>
           {slot.is_locked ? <Lock size={10}/> : <Unlock size={10}/>}
         </button>
         {!slot.is_locked && (
-          <button className="exam-slot-btn delete"
-            onClick={onDelete} title="Remove slot">
+          <button className="exam-slot-btn" onClick={onEditToggle}
+            style={{ color: isEditing ? 'var(--amber)' : 'var(--muted)' }}>
+            <Pencil size={10}/>
+          </button>
+        )}
+        {!slot.is_locked && (
+          <button className="exam-slot-btn delete" onClick={onDelete}>
             <X size={10}/>
           </button>
         )}

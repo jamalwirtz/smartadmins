@@ -55,7 +55,7 @@ function Toggle({ value, onChange, label }) {
 }
 
 export default function Settings() {
-  const { user }                  = useAuth()
+  const { user, setPhotoUrl: setGlobalPhoto } = useAuth()
   const { theme, toggle: toggleTheme } = useTheme()
 
   // ── state ──
@@ -112,14 +112,16 @@ export default function Settings() {
     setUploading(true)
     try {
       await profileAPI.uploadPhoto(file)
-      setPhotoUrl(profileAPI.photoUrl(user?.id) + '?t=' + Date.now())
+      const newUrl = profileAPI.photoUrl(user?.id) + '?t=' + Date.now()
+      setPhotoUrl(newUrl)
+      if (typeof setGlobalPhoto === 'function') setGlobalPhoto(newUrl)
       toast.success('Photo updated ✅')
     } catch { toast.error('Upload failed') }
     finally { setUploading(false) }
   }
 
   const handleRemovePhoto = async () => {
-    try { await profileAPI.deletePhoto(); setPhotoUrl(null); toast.success('Photo removed') }
+    try { await profileAPI.deletePhoto(); setPhotoUrl(null); if (typeof setGlobalPhoto==='function') setGlobalPhoto(null); toast.success('Photo removed') }
     catch { toast.error('Remove failed') }
   }
 
@@ -326,75 +328,27 @@ export default function Settings() {
           )}
         </Section>
 
-        {/* ── Timetable Time Config ── */}
-        {school && (
-          <Section icon={<Clock size={16}/>} title="Timetable Time Configuration">
-            <form onSubmit={handleSchoolSave} className="settings-form">
-              <Row label="School Start Time" hint="Time the first period begins">
-                <input type="time" className="settings-input" value={school.start_time || '08:00'}
-                  onChange={e => setSchool(s => ({ ...s, start_time: e.target.value }))}
-                  style={{ maxWidth:120 }} />
-              </Row>
-              <Row label="Period Duration" hint="Minutes per lesson period">
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <input type="number" className="settings-input" min={20} max={120}
-                    value={school.period_minutes || 45}
-                    onChange={e => setSchool(s => ({ ...s, period_minutes: +e.target.value }))}
-                    style={{ maxWidth:90 }} />
-                  <span style={{ fontSize:13, color:'var(--muted)' }}>minutes</span>
-                </div>
-              </Row>
-              <Row label="Periods per Day">
-                <input type="number" className="settings-input" min={1} max={12}
-                  value={school.periods_per_day || 8}
-                  onChange={e => setSchool(s => ({ ...s, periods_per_day: +e.target.value }))}
-                  style={{ maxWidth:90 }} />
-              </Row>
-              <Row label="Break After Period" hint="Insert a break after this period">
-                <input type="number" className="settings-input" min={1} max={12}
-                  value={school.break_after_period || 2}
-                  onChange={e => setSchool(s => ({ ...s, break_after_period: +e.target.value }))}
-                  style={{ maxWidth:90 }} />
-              </Row>
-              <Row label="Break Duration">
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <input type="number" className="settings-input" min={5} max={60}
-                    value={school.break_minutes || 15}
-                    onChange={e => setSchool(s => ({ ...s, break_minutes: +e.target.value }))}
-                    style={{ maxWidth:90 }} />
-                  <span style={{ fontSize:13, color:'var(--muted)' }}>minutes</span>
-                </div>
-              </Row>
-              <Row label="Lunch After Period" hint="Insert lunch break after this period">
-                <input type="number" className="settings-input" min={1} max={12}
-                  value={school.lunch_after_period || 4}
-                  onChange={e => setSchool(s => ({ ...s, lunch_after_period: +e.target.value }))}
-                  style={{ maxWidth:90 }} />
-              </Row>
-              <Row label="Lunch Duration">
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <input type="number" className="settings-input" min={15} max={120}
-                    value={school.lunch_minutes || 45}
-                    onChange={e => setSchool(s => ({ ...s, lunch_minutes: +e.target.value }))}
-                    style={{ maxWidth:90 }} />
-                  <span style={{ fontSize:13, color:'var(--muted)' }}>minutes</span>
-                </div>
-              </Row>
-              <Row label="School Days" hint="Comma-separated (e.g. Monday,Tuesday,Wednesday,Thursday,Friday)">
-                <input className="settings-input" value={school.school_days || ''}
-                  onChange={e => setSchool(s => ({ ...s, school_days: e.target.value }))}
-                  placeholder="Monday,Tuesday,Wednesday,Thursday,Friday" />
-              </Row>
-              <div className="settings-form-footer">
-                <button type="submit" className="btn btn-accent settings-save-btn" disabled={saving}>
-                  <Save size={14}/> {saving ? 'Saving…' : 'Save time config'}
-                </button>
-              </div>
-            </form>
-          </Section>
-        )}
+        {/* Time configuration moved to Schedule Settings page */}
+        <motion.div className="card" variants={pv}
+          style={{background:'rgba(245,158,11,.04)',border:'1.5px solid rgba(245,158,11,.2)',
+            borderRadius:'var(--r-xl)',padding:'18px 22px',display:'flex',
+            alignItems:'center',justifyContent:'space-between',gap:12}}>
+          <div>
+            <div style={{fontWeight:700,color:'var(--text)',marginBottom:4}}>
+              ⏰ Schedule & Time Configuration
+            </div>
+            <div style={{fontSize:13,color:'var(--muted)'}}>
+              Set period durations, break times, lunch, and school days
+            </div>
+          </div>
+          <a href="/schedule-settings" className="btn btn-secondary btn-sm"
+            style={{whiteSpace:'nowrap',textDecoration:'none'}}>
+            Open Schedule Settings →
+          </a>
+        </motion.div>
 
         {/* ── Appearance & PDF Theme ── */}
+
         <Section icon={<Palette size={16}/>} title="Appearance & PDF Themes">
           <Row label="App Theme" hint="Light, dark, or follow system preference">
             <div className="settings-theme-picker">
