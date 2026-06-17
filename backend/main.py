@@ -5,7 +5,6 @@ Run:    uvicorn main:app --reload        (from backend/)
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os as _os
 
@@ -168,32 +167,39 @@ _THIS_DIR  = _os.path.dirname(_os.path.abspath(__file__))
 _DIST_DIR  = _os.path.join(_THIS_DIR, "..", "frontend", "dist")
 _DIST_DIR  = _os.path.normpath(_DIST_DIR)
 
+# ── Serve React SPA (production) ──────────────────────────────────────────────
+# IMPORTANT: We do NOT use app.mount("/static") because that catches ALL paths
+# including /dashboard, /login etc. and returns 404 instead of index.html.
+# Instead we use a single catch-all route that:
+#   1. Serves exact files from dist/ (JS chunks, CSS, images, favicon)
+#   2. Falls back to index.html for everything else (React Router takes over)
+
 if _os.path.isdir(_DIST_DIR):
-    # Mount the assets folder (JS/CSS chunks Vite generates)
-    _assets = _os.path.join(_DIST_DIR, "assets")
-    if _os.path.isdir(_assets):
-        app.mount("/assets", StaticFiles(directory=_assets), name="assets")
 
-    # Mount any other static files at root level (favicon, logo, etc.)
-    app.mount("/static", StaticFiles(directory=_DIST_DIR), name="static")
-
-    # Catch-all: serve index.html for ALL non-API paths so React Router works
     @app.get("/{full_path:path}", include_in_schema=False)
     def serve_frontend(full_path: str):
-        # Try the exact file first (handles favicon.ico, logo.png etc.)
+        # Empty path → serve index.html (root URL)
+        if not full_path:
+            return FileResponse(_os.path.join(_DIST_DIR, "index.html"))
+
+        # Check for exact file match first (assets/index-xxx.js, favicon.png, logo.png…)
         exact = _os.path.join(_DIST_DIR, full_path)
         if _os.path.isfile(exact):
             return FileResponse(exact)
-        # Fall back to index.html — React Router handles the rest
+
+        # assets/ subfolder (Vite puts hashed JS/CSS here)
+        # path already resolved above via exact check
+
+        # SPA fallback — React Router handles /dashboard, /login, etc.
         return FileResponse(_os.path.join(_DIST_DIR, "index.html"))
 
 else:
-    # Dev mode — no dist folder, just return API info at /
+    # Dev mode only — no dist folder present
     @app.api_route("/", methods=["GET", "HEAD"], tags=["Health"])
     def root():
         return {
-            "app": settings.APP_NAME,
-            "version": settings.APP_VERSION,
+            "app": getattr(settings, "APP_NAME", "SSTG"),
+            "version": getattr(settings, "APP_VERSION", "1.0"),
             "docs": "/docs",
-            "note": "Frontend not built. Run: cd frontend && npm run build",
+            "note": "Frontend not built yet. Run: npm --prefix frontend run build",
         }

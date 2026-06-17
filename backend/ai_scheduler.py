@@ -3,7 +3,7 @@ SSTG — AI Scheduling Assistant (Google Gemini, free tier)
 ==========================================================
 Provides natural-language schedule generation and optimization.
 
-Free tier limits (gemini-1.5-flash):
+Free tier limits (gemini-2.0-flash):
   • 15 requests / minute
   • 1,000,000 tokens / day
   • No credit card required
@@ -47,7 +47,7 @@ def _get_model():
     try:
         import google.generativeai as genai
         genai.configure(api_key=cfg.GEMINI_API_KEY)
-        _gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+        _gemini_model = genai.GenerativeModel("gemini-2.0-flash")
         return _gemini_model
     except ImportError:
         raise HTTPException(
@@ -336,7 +336,7 @@ def ai_status(_: User = Depends(get_current_user)):
     configured = bool(cfg.GEMINI_API_KEY)
     return {
         "configured": configured,
-        "model":      "gemini-1.5-flash" if configured else None,
+        "model":      "gemini-2.0-flash" if configured else None,
         "free_tier":  "15 req/min, 1M tokens/day",
         "get_key_url": "https://aistudio.google.com/app/apikey",
         "message": (
