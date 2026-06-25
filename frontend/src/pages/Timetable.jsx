@@ -9,8 +9,8 @@ import { schedulesAPI, exportAPI, schoolAPI } from '../api/client'
 import { useDraftWS } from '../hooks/useWebSocket'
 import toast from 'react-hot-toast'
 import {
-  Zap, RefreshCw, Lock, Unlock, Download, CheckCircle,
-  Trash2, ShieldCheck, Users, Eye,
+  Zap, RefreshCw, Lock, Unlock, Download, CheckCircle, Check,
+  Trash2, ShieldCheck, Users, Eye, Palette, X, CalendarDays
 } from 'lucide-react'
 
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday']

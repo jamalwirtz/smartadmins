@@ -43,7 +43,7 @@ const Loader = ({ text = 'Loading…' }) => (
 
 const EmptyState = ({ icon: Icon, title, body, action, onAction }) => (
   <motion.div className="exam-empty" initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}>
-    <div className="exam-empty-icon"><Icon size={36} /></div>
+    <div className="exam-empty-icon"><BookOpen size={36} /></div>
     <h3 className="exam-empty-title">{title}</h3>
     <p className="exam-empty-body">{body}</p>
     {action && (
