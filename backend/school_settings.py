@@ -60,8 +60,11 @@ class SchoolSettingsUpdate(BaseModel):
     break_minutes:         Optional[int] = None
     lunch_after_period:    Optional[int] = None
     lunch_minutes:         Optional[int] = None
-    timetable_theme:       Optional[str] = None   # navy|green|amber|rose|slate
-    timetable_orientation: Optional[str] = None   # horizontal|vertical
+    timetable_theme:          Optional[str]  = None
+    timetable_orientation:    Optional[str]  = None
+    teacher_name_format:      Optional[str]  = None   # full_name|initials|short_name
+    exam_include_supervisors: Optional[bool] = None
+    exam_include_rooms:       Optional[bool] = None
     periods_per_day:       Optional[int] = None
     school_days:           Optional[str] = None
 
@@ -96,9 +99,12 @@ def get_settings_api(
         "lunch_after_period":    s.lunch_after_period,
         "lunch_minutes":         s.lunch_minutes,
         "timetable_theme":       s.timetable_theme,
-        "timetable_orientation": s.timetable_orientation,
-        "periods_per_day":       s.periods_per_day,
-        "school_days":           s.school_days,
+        "timetable_orientation":    s.timetable_orientation,
+        "periods_per_day":          s.periods_per_day,
+        "school_days":              s.school_days,
+        "teacher_name_format":      getattr(s, "teacher_name_format",      "full_name"),
+        "exam_include_supervisors": getattr(s, "exam_include_supervisors",  True),
+        "exam_include_rooms":       getattr(s, "exam_include_rooms",        True),
     }
 
 

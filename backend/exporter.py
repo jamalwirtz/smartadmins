@@ -90,6 +90,7 @@ class PDFExporter:
         return info
 
     def _time_labels(self, db=None) -> dict:
+        """Return {period_number: 'HH:MM–HH:MM'} from school settings."""
         labels = {}
         if not db: return labels
         try:
@@ -107,6 +108,33 @@ class PDFExporter:
         except Exception:
             pass
         return labels
+
+
+    def _name_format(self, db=None) -> str:
+        if not db: return 'full_name'
+        try:
+            from models import SchoolSettings
+            s = db.query(SchoolSettings).first()
+            return getattr(s, 'teacher_name_format', 'full_name') if s else 'full_name'
+        except Exception: return 'full_name'
+
+    def _fmt_teacher(self, teacher, fmt: str) -> str:
+        if not teacher: return ''
+        if fmt == 'initials':
+            return getattr(teacher, 'initials', None) or teacher.name[:3]
+        if fmt == 'short_name':
+            return getattr(teacher, 'short_name', None) or teacher.name.split()[-1]
+        return teacher.name
+
+    def _exam_cols(self, db=None) -> tuple:
+        if not db: return (True, True)
+        try:
+            from models import SchoolSettings
+            s = db.query(SchoolSettings).first()
+            if not s: return (True, True)
+            return (getattr(s,'exam_include_supervisors',True),
+                    getattr(s,'exam_include_rooms',True))
+        except Exception: return (True, True)
 
     def _header(self, story, title: str, db=None, badge_position='top-left'):
         import base64 as _b64
@@ -535,15 +563,14 @@ class ExcelExporter:
 
         for ri, sl in enumerate(slots, 5):
             row = [
-                sl.day,
-                sl.period,
+                sl.day, sl.period,
                 sl.paper.subject.name,
                 f"Paper {sl.paper.paper_number}",
                 sl.class_section.name,
                 sl.paper.duration_minutes,
-                sl.invigilator.name if sl.invigilator else "",
-                sl.room or "",
             ]
+            if inc_sup:  row.append(sl.invigilator.name if sl.invigilator else "")
+            if inc_room: row.append(sl.room or "")
             for ci, val in enumerate(row, 1):
                 c = ws_ov.cell(row=ri, column=ci, value=val)
                 c.alignment = Alignment(horizontal="center")

@@ -15,6 +15,7 @@ const avatarColor = name => COLORS[name.charCodeAt(0) % COLORS.length]
 
 const empty = {
   name:'', email:'', phone:'',
+  initials:'', short_name:'',
   is_part_time:false, max_weekly_hours:30,
   days_off:'', unavailable_slots:''
 }
@@ -183,8 +184,9 @@ export default function Teachers() {
                   onClick={() => openAssign(t)}>
 
                   <div className="teacher-avatar"
-                    style={{ background: avatarColor(t.name) }}>
-                    {initials(t.name)}
+                    style={{ background: avatarColor(t.name) }}
+                    title={`Initials: ${t.initials || initials(t.name)} | Short: ${t.short_name || t.name}`}>
+                    {t.initials || initials(t.name)}
                   </div>
 
                   <div className="teacher-info">
@@ -268,8 +270,38 @@ export default function Teachers() {
                     <User size={12}/> Teacher Name <span className="req">*</span>
                   </label>
                   <input className="teacher-form-input" value={form.name} autoFocus
-                    onChange={e => setForm(f=>({...f,name:e.target.value}))}
+                    onChange={e => {
+                      const n = e.target.value
+                      const titles = new Set(['mr','mrs','ms','dr','prof','rev'])
+                      const parts = n.trim().split(' ').filter(p => !titles.has(p.toLowerCase().replace('.','')))
+                      const autoInit = parts.map(p=>p[0]?.toUpperCase()||'').join('').slice(0,4)
+                      const autoShort = parts.length >= 2
+                        ? `${n.trim().split(' ')[0]} ${parts[parts.length-1]}`
+                        : n
+                      setForm(f=>({...f, name:n,
+                        initials:   f.initials   || autoInit,
+                        short_name: f.short_name || autoShort,
+                      }))
+                    }}
                     placeholder="e.g. Mrs Alice Kamau" />
+                </div>
+
+                <div className="teacher-form-row">
+                  <div className="teacher-form-field">
+                    <label className="teacher-form-label">Initials</label>
+                    <input className="teacher-form-input" value={form.initials}
+                      onChange={e => setForm(f=>({...f, initials:e.target.value.toUpperCase().slice(0,4)}))}
+                      placeholder="AK" maxLength={4}
+                      style={{fontFamily:'var(--font-numeric)',fontWeight:800,letterSpacing:2}} />
+                    <span style={{fontSize:10,color:'var(--muted)',marginTop:2}}>Auto-filled from name</span>
+                  </div>
+                  <div className="teacher-form-field">
+                    <label className="teacher-form-label">Short Name</label>
+                    <input className="teacher-form-input" value={form.short_name}
+                      onChange={e => setForm(f=>({...f, short_name:e.target.value}))}
+                      placeholder="Mrs Kamau" />
+                    <span style={{fontSize:10,color:'var(--muted)',marginTop:2}}>Used on compact exports</span>
+                  </div>
                 </div>
 
                 <div className="teacher-form-row">

@@ -8,12 +8,41 @@ from models import Teacher, TeacherSubject, TimetableSlot, Subject, ClassSection
 from schemas import TeacherCreate, TeacherUpdate, SubjectAssignRequest
 from security import get_current_user, require_admin
 
+
+
+def _auto_initials(name: str) -> str:
+    """
+    Generate initials from a teacher name.
+    Skips common titles (Mr, Mrs, Ms, Dr, Prof).
+    "Mrs Alice Kamau"  → "AK"
+    "Mr Brian Otieno"  → "BO"
+    "Dr Carol Wanjiku" → "CW"
+    """
+    TITLES = {"mr","mrs","ms","dr","prof","rev","sr","jr"}
+    parts = [p for p in name.strip().split() if p.lower().rstrip(".") not in TITLES]
+    return "".join(p[0].upper() for p in parts if p)[:4]  # max 4 chars
+
+
+def _auto_short(name: str) -> str:
+    """
+    "Mrs Alice Kamau" → "Mrs Kamau"
+    "Mr Brian Otieno" → "Mr Otieno"
+    """
+    parts = name.strip().split()
+    if len(parts) >= 2:
+        return f"{parts[0]} {parts[-1]}"
+    return name
+
 router = APIRouter()
 
 
 def _teacher_out(t: Teacher):
     return {
-        "id": t.id, "name": t.name, "email": t.email,
+        "id": t.id, "name": t.name,
+        "initials":   getattr(t,"initials",None) or _auto_initials(t.name),
+        "short_name": getattr(t,"short_name",None) or _auto_short(t.name),
+        "phone":      getattr(t,"phone",None),
+        "email": t.email,
         "is_part_time": t.is_part_time, "max_weekly_hours": t.max_weekly_hours,
         "days_off": t.days_off, "unavailable_slots": t.unavailable_slots,
         "subject_ids": [ts.subject_id for ts in t.subjects],

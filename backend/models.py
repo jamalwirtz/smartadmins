@@ -39,6 +39,9 @@ class Teacher(Base):
     __tablename__ = "teachers"
     id               = Column(String(36),  primary_key=True, default=_uuid)
     name             = Column(String(120), nullable=False)
+    initials         = Column(String(10),  nullable=True)   # auto or manual: "AK", "MAK"
+    short_name       = Column(String(40),  nullable=True)   # e.g. "Mr Kamau"
+    phone            = Column(String(40),  nullable=True)
     email            = Column(String(120), unique=True, nullable=True)
     is_part_time     = Column(Boolean, default=False)
     max_weekly_hours = Column(Integer, default=30)
@@ -226,8 +229,11 @@ class SchoolSettings(Base):
     lunch_minutes = Column(Integer,     default=45)
     # Display preferences
     timetable_theme     = Column(String(20), default="navy")   # navy|green|amber|rose|slate
-    timetable_orientation = Column(String(12), default="horizontal") # horizontal|vertical
-    periods_per_day     = Column(Integer, default=8)
+    timetable_orientation    = Column(String(12),  default="horizontal")
+    teacher_name_format      = Column(String(20),  default="full_name")  # full_name|initials|short_name
+    exam_include_supervisors = Column(Boolean,      default=True)
+    exam_include_rooms       = Column(Boolean,      default=True)
+    periods_per_day          = Column(Integer,      default=8)
     school_days         = Column(String(80), default="Monday,Tuesday,Wednesday,Thursday,Friday")
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 

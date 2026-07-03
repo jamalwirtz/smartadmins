@@ -69,11 +69,13 @@ class SlotUpdate(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    subject_ids:   List[str] = Field(..., min_length=1)
-    class_ids:     List[str] = Field(..., min_length=1)
-    start_period:  int  = Field(1, ge=1)
-    max_per_day:   int  = Field(1, ge=1, le=4, description="Max exams per class per day")
-    school_days:   List[str] = Field(
+    subject_ids:          List[str] = Field(..., min_length=1)
+    class_ids:            List[str] = Field(..., min_length=1)
+    start_period:         int  = Field(1, ge=1)
+    max_per_day:          int  = Field(1, ge=1, le=4)
+    include_supervisors:  bool = True
+    include_rooms:        bool = True
+    school_days:          List[str] = Field(
         default=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
     )
 

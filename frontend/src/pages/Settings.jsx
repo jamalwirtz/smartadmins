@@ -425,6 +425,62 @@ export default function Settings() {
                 ))}
               </div>
             </Row>
+
+            {/* Teacher name format */}
+            <Row label="Teacher Name Format on Exports"
+                 hint="How teacher names appear in generated PDFs and spreadsheets">
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {[
+                  {id:'full_name',  label:'Full Name',   ex:'Mrs Alice Kamau'},
+                  {id:'short_name', label:'Short Name',  ex:'Mrs Kamau'},
+                  {id:'initials',   label:'Initials',    ex:'AK'},
+                ].map(opt => (
+                  <button key={opt.id}
+                    className={`settings-orientation-btn${school.teacher_name_format===opt.id?' active':''}`}
+                    style={{flexDirection:'column',alignItems:'flex-start',gap:2,minWidth:100}}
+                    onClick={() => {
+                      setSchool(s=>({...s,teacher_name_format:opt.id}))
+                      schoolAPI.updateSettings({teacher_name_format:opt.id})
+                        .then(()=>toast.success(`Name format: ${opt.label}`))
+                    }}>
+                    <div style={{fontWeight:700,fontSize:12}}>{opt.label}</div>
+                    <div style={{fontSize:10,color:'var(--muted)',fontStyle:'italic'}}>{opt.ex}</div>
+                    {school.teacher_name_format===opt.id && <Check size={11} style={{color:'var(--amber)',marginTop:2}}/>}
+                  </button>
+                ))}
+              </div>
+            </Row>
+
+            {/* Exam export toggles */}
+            <Row label="Exam Export Columns"
+                 hint="Choose which columns appear in exam PDF and Excel exports">
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:13}}>
+                  <input type="checkbox"
+                    checked={!!school.exam_include_supervisors}
+                    onChange={e=>{
+                      setSchool(s=>({...s,exam_include_supervisors:e.target.checked}))
+                      schoolAPI.updateSettings({exam_include_supervisors:e.target.checked})
+                    }}/>
+                  <div>
+                    <div style={{fontWeight:600,color:'var(--text)'}}>Include Supervisors column</div>
+                    <div style={{fontSize:11,color:'var(--muted)'}}>Show invigilator names in exam exports</div>
+                  </div>
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:13}}>
+                  <input type="checkbox"
+                    checked={!!school.exam_include_rooms}
+                    onChange={e=>{
+                      setSchool(s=>({...s,exam_include_rooms:e.target.checked}))
+                      schoolAPI.updateSettings({exam_include_rooms:e.target.checked})
+                    }}/>
+                  <div>
+                    <div style={{fontWeight:600,color:'var(--text)'}}>Include Rooms column</div>
+                    <div style={{fontSize:11,color:'var(--muted)'}}>Show room names in exam exports</div>
+                  </div>
+                </label>
+              </div>
+            </Row>
           )}
         </Section>
 

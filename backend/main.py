@@ -85,20 +85,31 @@ def _ensure_demo_data():
         link(esther, math7); link(esther, chem8)
         link(felix,  sci7);  link(felix,  phy8); link(felix, chem8)
 
-        # ── Class sections ────────────────────────────────────────────────
-        for name, grade in [("7A","7"), ("7B","7"), ("8A","8"), ("8B","8")]:
-            db.add(ClassSection(name=name, grade_level=grade))
-
+        # Commit admin + teachers + subjects FIRST (critical path)
         db.commit()
-        print("[boot] Demo data seeded: admin/admin123 + 6 teachers + 9 subjects + 4 classes")
-        # Seed default school settings if not present
-        if not db.query(SchoolSettings).first():
-            db.add(SchoolSettings(
-                school_name="Greenfield Academy",
-                academic_year="2025/2026",
-                country_code="ZA",
-            ))
+        print("[boot] admin/teachers/subjects seeded ✅")
+
+        # Class sections in a SEPARATE transaction (non-critical)
+        # Isolated so schema-mismatch errors don't roll back the admin user
+        try:
+            for name, grade in [("7A","7"), ("7B","7"), ("8A","8"), ("8B","8")]:
+                db.add(ClassSection(name=name, grade_level=grade))
             db.commit()
+        except Exception:
+            db.rollback()
+            print("[boot] Class seed skipped — schema migration will handle this")
+
+        # School settings (separate transaction)
+        try:
+            if not db.query(SchoolSettings).first():
+                db.add(SchoolSettings(
+                    school_name="Greenfield Academy",
+                    academic_year="2025/2026",
+                    country_code="ZA",
+                ))
+                db.commit()
+        except Exception:
+            db.rollback()
 
     except Exception as e:
         db.rollback()
@@ -107,6 +118,56 @@ def _ensure_demo_data():
         db.close()
 
 _ensure_demo_data()
+
+# ── Auto-migrate: add any new columns to existing tables ─────────────────────
+def _run_migrations():
+    """
+    Safe ALTER TABLE statements — each is idempotent (IF NOT EXISTS).
+    Handles schema changes without Alembic for simple column additions.
+    """
+    from sqlalchemy import text
+    from database import SessionLocal
+    db = SessionLocal()
+    migrations = [
+        # ClassSection new columns
+        "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS stream VARCHAR(40)",
+        "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 40",
+        "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
+        # SchoolSettings new columns
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS badge_position VARCHAR(20) DEFAULT 'top-left'",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_motto VARCHAR(200)",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_email VARCHAR(120)",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_phone VARCHAR(40)",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_address VARCHAR(300)",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS timetable_orientation VARCHAR(12) DEFAULT 'horizontal'",
+        # ExamSlot new column
+        "ALTER TABLE exam_slots ADD COLUMN IF NOT EXISTS room_id VARCHAR(36)",
+        # Teacher new columns
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS initials VARCHAR(10)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS short_name VARCHAR(40)",
+        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS phone VARCHAR(40)",
+        # SchoolSettings name format + exam toggles
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS teacher_name_format VARCHAR(20) DEFAULT 'full_name'",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_supervisors BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_rooms BOOLEAN DEFAULT TRUE",
+    ]
+    try:
+        from database import db_url
+        is_pg = 'postgresql' in db_url
+        if is_pg:  # Only run on PostgreSQL — SQLite uses create_all
+            for sql in migrations:
+                try:
+                    db.execute(text(sql))
+                except Exception:
+                    pass  # Column may already exist
+            db.commit()
+            print("[boot] DB migrations applied ✅")
+    except Exception as e:
+        print(f"[boot] Migration note: {e}")
+    finally:
+        db.close()
+
+_run_migrations()
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -158,6 +219,17 @@ app.include_router(websockets.router, tags=["WebSockets"])
 @app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
 def health():
     return {"status": "ok"}
+
+
+@app.api_route("/ping", methods=["GET", "HEAD"], tags=["Health"])
+def ping():
+    """
+    Ultra-lightweight keepalive endpoint.
+    Pin this URL in UptimeRobot (free) to ping every 5 minutes
+    and prevent Render free-tier cold starts.
+    https://uptimerobot.com — add monitor → HTTP(s) → your-app.onrender.com/ping
+    """
+    return "pong"
 
 
 # ── Serve React frontend (production) ─────────────────────────────────────────

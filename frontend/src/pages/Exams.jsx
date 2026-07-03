@@ -95,6 +95,8 @@ export default function Exams() {
   const [genForm, setGenForm] = useState({
     subject_ids:[], class_ids:[], start_period:1, max_per_day:1,
     school_days:[...DAYS],
+    include_supervisors: true,
+    include_rooms:       true,
   })
   const [tplApplyForm, setTplApplyForm] = useState({
     template_id:'', session_name:'', start_date:'', end_date:'',
@@ -766,6 +768,27 @@ export default function Exams() {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              <div className="exam-gen-toggles">
+                <label className="exam-gen-toggle-row">
+                  <input type="checkbox"
+                    checked={genForm.include_supervisors}
+                    onChange={e => setGenForm(f=>({...f, include_supervisors: e.target.checked}))}/>
+                  <div>
+                    <div className="exam-gen-toggle-label">Include Supervisors</div>
+                    <div className="exam-gen-toggle-hint">Show supervisor columns in PDF / Excel</div>
+                  </div>
+                </label>
+                <label className="exam-gen-toggle-row">
+                  <input type="checkbox"
+                    checked={genForm.include_rooms}
+                    onChange={e => setGenForm(f=>({...f, include_rooms: e.target.checked}))}/>
+                  <div>
+                    <div className="exam-gen-toggle-label">Include Rooms</div>
+                    <div className="exam-gen-toggle-hint">Show room columns in PDF / Excel</div>
+                  </div>
+                </label>
               </div>
 
               <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:16 }}>

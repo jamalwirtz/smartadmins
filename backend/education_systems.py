@@ -27,7 +27,9 @@ def _seed(db: Session):
 
 @router.get("/education-systems")
 def list_systems(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    _seed(db)
+    # _seed only if empty (check count first — fast single query)
+    if db.query(EducationSystem).count() == 0:
+        _seed(db)
     return [{"id":s.id,"name":s.name,"code":s.code,"levels":s.levels,"is_custom":s.is_custom}
             for s in db.query(EducationSystem).all()]
 
