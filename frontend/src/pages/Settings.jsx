@@ -425,8 +425,10 @@ export default function Settings() {
                 ))}
               </div>
             </Row>
+          )}
 
-            {/* Teacher name format */}
+          {/* Teacher name format */}
+          {school && (
             <Row label="Teacher Name Format on Exports"
                  hint="How teacher names appear in generated PDFs and spreadsheets">
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -450,8 +452,10 @@ export default function Settings() {
                 ))}
               </div>
             </Row>
+          )}
 
-            {/* Exam export toggles */}
+          {/* Exam export toggles */}
+          {school && (
             <Row label="Exam Export Columns"
                  hint="Choose which columns appear in exam PDF and Excel exports">
               <div style={{display:'flex',flexDirection:'column',gap:8}}>

@@ -81,7 +81,24 @@ export default function Login() {
         </motion.div>
 
         {/* ── Auth card ── */}
-        <motion.div className="login-card"
+        {/* Back to home */}
+      <motion.div style={{ position:'fixed', top:20, left:24, zIndex:10 }}
+        initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}} transition={{delay:.2}}>
+        <Link to="/" style={{
+          display:'flex', alignItems:'center', gap:7,
+          color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:600,
+          textDecoration:'none', padding:'7px 14px',
+          background:'rgba(255,255,255,.08)',
+          borderRadius:20, border:'1px solid rgba(255,255,255,.12)',
+          backdropFilter:'blur(8px)', transition:'all .15s',
+        }}
+        onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,255,255,.15)'; e.currentTarget.style.color='#fff' }}
+        onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,.08)'; e.currentTarget.style.color='rgba(255,255,255,.7)' }}>
+          ← Back to Home
+        </Link>
+      </motion.div>
+
+      <motion.div className="login-card"
           initial={{ opacity:0, x:60, scale:0.96 }} animate={{ opacity:1, x:0, scale:1 }}
           transition={{ duration:0.6, delay:0.1, ease:[0.4,0,0.2,1] }}>
 

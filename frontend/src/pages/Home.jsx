@@ -1,215 +1,361 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import {
   CalendarDays, Users, BookOpen, FileDown, Zap, Lock, Globe,
-  ArrowRight, ChevronDown, GripHorizontal, CheckCircle, Star, LogIn
+  ArrowRight, CheckCircle, Star, LogIn, Play, Pause,
+  GraduationCap, BarChart2, Shield, Clock, Sparkles,
+  ChevronRight, Menu, X as XIcon
 } from 'lucide-react'
 
-/* ── Feature data ────────────────────────────────────────────────────────── */
+/* ── Data ─────────────────────────────────────────────────────────────── */
 const FEATURES = [
-  {
-    icon: <Zap size={22} />, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',
-    title: 'AI-Powered Scheduling',
-    body: 'Constraint-based engine generates multiple conflict-free timetable drafts in seconds — handling teacher availability, max hours, and class requirements automatically.'
-  },
-  {
-    icon: <GripHorizontal size={22} />, color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',
-    title: 'Drag & Drop Editor',
-    body: 'Visually move and swap any lesson slot. Lock critical slots so they survive reshuffles. Real-time conflict validation — you can\'t break the timetable accidentally.'
-  },
-  {
-    icon: <Users size={22} />, color: '#10b981', bg: 'rgba(16,185,129,0.12)',
-    title: 'Teacher Management',
-    body: 'Set per-teacher weekly hour caps, part-time day restrictions, and subject assignments. Every constraint is respected at generation time.'
-  },
-  {
-    icon: <FileDown size={22} />, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)',
-    title: 'PDF Export & Email',
-    body: 'Export the full school timetable or individual teacher PDFs. Email any teacher their personal schedule directly from the dashboard — one click.'
-  },
-  {
-    icon: <Globe size={22} />, color: '#ef4444', bg: 'rgba(239,68,68,0.12)',
-    title: 'Real-Time Collaboration',
-    body: 'WebSocket-powered live updates mean changes appear instantly for every connected admin — no refreshing, no stale data.'
-  },
-  {
-    icon: <Lock size={22} />, color: '#0d9488', bg: 'rgba(13,148,136,0.12)',
-    title: 'Multi-Draft Workflow',
-    body: 'Generate 3+ drafts at once, compare them side by side, and activate the best one. Previous drafts are preserved for rollback.'
-  },
+  { icon:<Zap size={22}/>,         color:'#f59e0b', bg:'rgba(245,158,11,.12)',  title:'AI-Powered Scheduling',    body:'Constraint-based engine generates multiple conflict-free timetable drafts in seconds — handling teacher availability, max hours, and class requirements automatically.' },
+  { icon:<Users size={22}/>,       color:'#10b981', bg:'rgba(16,185,129,.12)',   title:'Teacher Management',       body:'Set per-teacher weekly hour caps, part-time day restrictions, and subject assignments. Every constraint is respected at generation time.' },
+  { icon:<GraduationCap size={22}/>,color:'#8b5cf6',bg:'rgba(139,92,246,.12)',  title:'Exam Scheduling',          body:'Full exam session management with paper configuration, supervisor allocation, room assignment, and conflict detection across all classes.' },
+  { icon:<FileDown size={22}/>,    color:'#3b82f6', bg:'rgba(59,130,246,.12)',   title:'PDF & Excel Export',       body:'Export the full school timetable or individual teacher PDFs in 5 colour themes. Email any teacher their personal schedule directly from the dashboard.' },
+  { icon:<BarChart2 size={22}/>,   color:'#ef4444', bg:'rgba(239,68,68,.12)',    title:'Teacher Comparison',       body:'View all teacher schedules side-by-side on one screen. Colour-coded workload bars instantly reveal who is overloaded and who has capacity.' },
+  { icon:<Shield size={22}/>,      color:'#0d9488', bg:'rgba(13,148,136,.12)',   title:'Multi-Draft Workflow',     body:'Generate 3+ drafts at once, compare them, and activate the best one. Previous drafts are preserved for rollback at any time.' },
 ]
 
 const STEPS = [
-  { n: '01', title: 'Add your school data', body: 'Enter your teachers, their subjects and availability, then define your class sections. A one-time setup that takes under 10 minutes.' },
-  { n: '02', title: 'Generate timetable drafts', body: 'Hit Generate. The engine produces multiple conflict-free drafts instantly, scoring each one for balance and teacher workload.' },
-  { n: '03', title: 'Fine-tune with drag & drop', body: 'Drag lessons, swap slots, lock favourites. Every move is validated live — conflicts are impossible.' },
-  { n: '04', title: 'Export and share', body: 'Activate your chosen draft, export PDFs for the school and every teacher, and email them all in one action.' },
+  { n:'01', title:'Add your school data',        body:'Enter teachers, subjects, and class sections. A one-time setup that takes under 10 minutes.' },
+  { n:'02', title:'Generate timetable drafts',   body:'Hit Generate. The AI produces multiple conflict-free drafts instantly, scoring each for balance.' },
+  { n:'03', title:'Fine-tune visually',           body:'Drag lessons, swap slots, lock favourites. Every move is validated live — conflicts are impossible.' },
+  { n:'04', title:'Export and share',             body:'Activate your draft, export PDFs for the school and every teacher, and email them all in one action.' },
 ]
 
 const STATS = [
-  { value: '< 3s', label: 'Timetable generation' },
-  { value: '100%', label: 'Conflict-free guarantee' },
-  { value: '1-click', label: 'PDF export' },
-  { value: '∞', label: 'Draft revisions' },
+  { value:'< 3s',  label:'Timetable generation' },
+  { value:'100%',  label:'Conflict-free guarantee' },
+  { value:'5+',    label:'Curriculum systems' },
+  { value:'∞',     label:'Draft revisions' },
 ]
 
-/* ── Nav ─────────────────────────────────────────────────────────────────── */
+const TESTIMONIALS = [
+  { name:'Mrs R. Nakato', role:'Academic Registrar', school:'Kampala High School', text:'We cut our timetabling time from 3 days to 20 minutes. The conflict detection alone is worth it.', rating:5 },
+  { name:'Mr J. Ochieng', role:'Deputy Headteacher', school:'St Mary\'s College Kisubi', text:'The exam scheduling module is brilliant. Supervisors, rooms, and conflict checks — all automated.', rating:5 },
+  { name:'Dr A. Ssali',   role:'Head of Academics',  school:'Greenhill Academy',         text:'Teacher comparison view showed us two teachers were overloaded that we hadn\'t noticed. Game changer.', rating:5 },
+]
+
+const CURRICULUM = ['Cambridge CAIE','UNEB Uganda','IB Diploma','CBC Kenya','American (AP)','Custom']
+
+/* ── Nav ──────────────────────────────────────────────────────────────── */
 function HomeNav() {
-  const navigate = useNavigate()
+  const navigate   = useNavigate()
+  const [open, setOpen] = useState(false)
   return (
-    <motion.header className="home-nav"
-      initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.4,0,0.2,1] }}>
+    <nav className="home-nav">
       <div className="home-nav-inner">
-        <Link to="/" className="home-nav-brand">
-          <img src="/logo.png" alt="Smart Admin" className="home-nav-logo" />
-          <span className="home-nav-title">Smart Admin</span>
-        </Link>
-        <nav className="home-nav-links">
-          <a href="#features" className="home-nav-link">Features</a>
-          <a href="#how-it-works" className="home-nav-link">How it works</a>
-          <a href="#about" className="home-nav-link">About</a>
-        </nav>
-        <div className="home-nav-actions">
-          <Link to="/login" className="home-btn-ghost">Sign in</Link>
-          <Link to="/signup" className="home-btn-primary">Get started free <ArrowRight size={14} /></Link>
+        <div className="home-nav-brand">
+          <img src="/logo.png" alt="Smart Admin" className="home-nav-logo"/>
+          <span className="home-nav-name">Smart Admin</span>
         </div>
+        <div className="home-nav-links">
+          <a href="#features"     className="home-nav-link">Features</a>
+          <a href="#how-it-works" className="home-nav-link">How it works</a>
+          <a href="#testimonials" className="home-nav-link">Reviews</a>
+          <a href="#pricing"      className="home-nav-link">Curriculum</a>
+        </div>
+        <div className="home-nav-actions">
+          <Link to="/login"  className="home-nav-btn-ghost">Sign In</Link>
+          <Link to="/signup" className="home-nav-btn-solid">Get Started →</Link>
+        </div>
+        <button className="home-nav-hamburger" onClick={() => setOpen(o=>!o)}>
+          {open ? <XIcon size={20}/> : <Menu size={20}/>}
+        </button>
       </div>
-    </motion.header>
+      <AnimatePresence>
+        {open && (
+          <motion.div className="home-nav-mobile"
+            initial={{opacity:0,y:-10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}}>
+            {['Features','How it works','Reviews','Curriculum'].map(l => (
+              <a key={l} href={`#${l.toLowerCase().replace(/ /g,'-')}`}
+                className="home-nav-mobile-link" onClick={() => setOpen(false)}>{l}</a>
+            ))}
+            <div style={{display:'flex',gap:10,padding:'12px 0'}}>
+              <Link to="/login"  className="home-nav-btn-ghost" style={{flex:1,textAlign:'center'}}>Sign In</Link>
+              <Link to="/signup" className="home-nav-btn-solid" style={{flex:1,textAlign:'center'}}>Get Started</Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </nav>
   )
 }
 
-/* ── Main component ──────────────────────────────────────────────────────── */
-export default function Home() {
-  const heroRef = useRef(null)
-  const { login } = useAuth()
-  const [demoLoading, setDemoLoading] = useState(false)
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
+/* ── Demo video player ────────────────────────────────────────────────── */
+function DemoVideo() {
+  const [playing, setPlaying] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const videoRef = useRef(null)
 
-  const handleTryDemo = async () => {
-    setDemoLoading(true)
-    try {
-      await login('admin', 'admin123')
-      navigate('/dashboard')
-    } catch {
-      navigate('/login')
-    } finally {
-      setDemoLoading(false)
-    }
+  const toggle = () => {
+    if (!videoRef.current) return
+    if (playing) { videoRef.current.pause(); setPlaying(false) }
+    else         { videoRef.current.play().then(() => setPlaying(true)).catch(() => {}) }
   }
-  const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '30%'])
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0])
+
+  return (
+    <div className="demo-video-wrap"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}>
+
+      {/* Glow effect */}
+      <div className="demo-video-glow"/>
+
+      {/* Browser chrome mockup */}
+      <div className="demo-browser">
+        <div className="demo-browser-bar">
+          <div className="demo-browser-dots">
+            <span style={{background:'#ef4444'}}/><span style={{background:'#f59e0b'}}/><span style={{background:'#22c55e'}}/>
+          </div>
+          <div className="demo-browser-url">smartadmin.onrender.com/timetable</div>
+        </div>
+        <div className="demo-browser-body">
+          {/* Video element — replace src with your actual screen recording */}
+          <video
+            ref={videoRef}
+            className="demo-video-el"
+            src="/demo.mp4"
+            playsInline muted loop
+            poster="/demo-poster.png"
+            onEnded={() => setPlaying(false)}
+            onError={() => {}}
+          />
+
+          {/* Animated UI preview (shown when no video file) */}
+          <div className="demo-ui-preview">
+            <AnimatedTimetable/>
+          </div>
+
+          {/* Play/pause overlay */}
+          <motion.div className="demo-play-overlay"
+            animate={{ opacity: hovered || !playing ? 1 : 0 }}
+            transition={{ duration: .2 }}
+            onClick={toggle}>
+            <motion.button className="demo-play-btn"
+              whileHover={{ scale:1.08 }} whileTap={{ scale:.94 }}>
+              {playing ? <Pause size={28}/> : <Play size={28} style={{marginLeft:3}}/>}
+            </motion.button>
+            {!playing && (
+              <div className="demo-play-label">
+                Watch the 20-second demo
+              </div>
+            )}
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Animated timetable (CSS-only demo when no video) ────────────────── */
+function AnimatedTimetable() {
+  const DAYS    = ['Mon','Tue','Wed','Thu','Fri']
+  const PERIODS = [1,2,3,4]
+  const SUBJECTS = [
+    {name:'Maths',   color:'#2952a3'}, {name:'English', color:'#0d9488'},
+    {name:'Science', color:'#7c3aed'}, {name:'History', color:'#d97706'},
+    {name:'PE',      color:'#dc2626'}, {name:'Art',     color:'#0891b2'},
+    {name:'Music',   color:'#16a34a'}, {name:'ICT',     color:'#c2410c'},
+  ]
+
+  const cells = DAYS.flatMap((d,di) =>
+    PERIODS.map((p,pi) => ({
+      day:d, period:p,
+      subj: SUBJECTS[(di*PERIODS.length + pi) % SUBJECTS.length],
+      delay: (di*PERIODS.length + pi) * 0.07,
+    }))
+  )
+
+  return (
+    <div className="demo-anim-wrap">
+      <div className="demo-anim-header">
+        <div className="demo-anim-title">Class 7A — Timetable Draft 2</div>
+        <div className="demo-anim-badge">● Live</div>
+      </div>
+      <div className="demo-anim-grid">
+        {/* Header row */}
+        <div className="demo-anim-corner"/>
+        {DAYS.map(d => <div key={d} className="demo-anim-day">{d}</div>)}
+        {/* Body */}
+        {PERIODS.map(p => (
+          <div key={p} style={{display:'contents'}}>
+            <div className="demo-anim-period">P{p}</div>
+            {DAYS.map((d,di) => {
+              const cell = cells.find(c=>c.day===d&&c.period===p)
+              return (
+                <motion.div key={d} className="demo-anim-cell"
+                  style={{ background:`${cell.subj.color}20`, borderColor:`${cell.subj.color}50` }}
+                  initial={{opacity:0,scale:.8}}
+                  animate={{opacity:1,scale:1}}
+                  transition={{delay:cell.delay, duration:.35, ease:[.34,1.56,.64,1]}}>
+                  <div style={{fontSize:9,fontWeight:800,color:cell.subj.color}}>
+                    {cell.subj.name}
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="demo-anim-footer">
+        <motion.div className="demo-anim-progress"
+          initial={{width:0}} animate={{width:'100%'}}
+          transition={{duration:3,ease:'linear',repeat:Infinity}}>
+          <div className="demo-anim-progress-fill"/>
+        </motion.div>
+        <span className="demo-anim-footer-label">
+          <Zap size={11}/> Generating conflict-free schedule…
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/* ── Star rating ─────────────────────────────────────────────────────── */
+function Stars({ n }) {
+  return (
+    <div style={{display:'flex',gap:3,marginBottom:10}}>
+      {[...Array(n)].map((_,i) => <Star key={i} size={13} fill="#f59e0b" color="#f59e0b"/>)}
+    </div>
+  )
+}
+
+/* ── Main ─────────────────────────────────────────────────────────────── */
+export default function Home() {
+  const { user } = useAuth()
+  const navigate  = useNavigate()
+  const heroRef   = useRef(null)
+  const { scrollYProgress } = useScroll({ target: heroRef, offset:['start start','end start'] })
+  const heroY     = useTransform(scrollYProgress, [0,1], ['0%','30%'])
+  const heroOpac  = useTransform(scrollYProgress, [0,.7], [1,0])
+
+  const handleDemo = async () => {
+    try {
+      const { authAPI } = await import('../api/client')
+      const r  = await authAPI.login('admin','admin123')
+      localStorage.setItem('sstg_token', r.data.access_token)
+      navigate('/dashboard')
+    } catch { navigate('/login') }
+  }
 
   return (
     <div className="home-page">
-      <HomeNav />
+      <HomeNav/>
 
-      {/* ── HERO ────────────────────────────────────────────────────────── */}
-      <section className="home-hero" ref={heroRef}>
-        {/* Background grid + orbs */}
-        <div className="home-hero-bg" />
-        <div className="home-hero-grid" />
-        {[
-          { w:500,h:500,top:'10%',left:'5%',  c:'rgba(41,82,163,0.2)',  dur:12, dx:30,dy:-20 },
-          { w:350,h:350,bottom:'5%',right:'8%',c:'rgba(245,158,11,0.15)',dur:9,  dx:-24,dy:28, delay:2 },
-          { w:250,h:250,top:'35%',right:'22%', c:'rgba(13,148,136,0.12)',dur:14, dx:18, dy:-35, delay:4 },
-        ].map((o,i) => (
-          <motion.div key={i} style={{ position:'absolute',width:o.w,height:o.h,borderRadius:'50%',
-            background:`radial-gradient(circle,${o.c},transparent)`,
-            top:o.top,bottom:o.bottom,left:o.left,right:o.right,pointerEvents:'none',zIndex:0 }}
-            animate={{ y:[0,o.dy,0],x:[0,o.dx,0] }}
-            transition={{ duration:o.dur,repeat:Infinity,ease:'easeInOut',delay:o.delay||0 }} />
-        ))}
-
-        <motion.div className="home-hero-content" style={{ y: heroY, opacity: heroOpacity }}>
-          {/* Badge */}
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      <section ref={heroRef} className="home-hero">
+        <div className="home-hero-bg"/>
+        <div className="home-hero-grid"/>
+        <div className="home-hero-orbs">
+          <div className="home-orb home-orb-1"/>
+          <div className="home-orb home-orb-2"/>
+          <div className="home-orb home-orb-3"/>
+        </div>
+        <motion.div className="home-hero-content" style={{ y: heroY, opacity: heroOpac }}>
           <motion.div className="home-hero-badge"
-            initial={{ opacity:0, scale:0.85 }} animate={{ opacity:1, scale:1 }}
-            transition={{ duration:0.5, delay:0.1, ease:[0.34,1.56,0.64,1] }}>
-            <Star size={11} fill="currentColor" /> Enterprise School Timetabling
+            initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:.1}}>
+            <Sparkles size={13}/> AI-Powered School Management
           </motion.div>
-
-          {/* Headline */}
-          <motion.h1 className="home-hero-h1"
-            initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }}
-            transition={{ duration:0.7, delay:0.2, ease:[0.4,0,0.2,1] }}>
-            Your school's perfect
-            <br />
-            <span className="home-hero-gradient">timetable in seconds</span>
+          <motion.h1 className="hero-headline"
+            style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,letterSpacing:"-0.03em"}}
+            initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{delay:.2,duration:.6}}>
+            Build Your School's<br/>
+            <span className="hero-headline-accent">Perfect Timetable</span><br/>
+            in Under 3 Minutes
           </motion.h1>
-
-          {/* Sub */}
-          <motion.p className="home-hero-sub"
-            initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-            transition={{ duration:0.6, delay:0.35 }}>
-            Smart Admin generates conflict-free timetables automatically — no spreadsheets, no clashes, no headaches.
-            Teachers get PDFs in their inbox before the first bell.
+          <motion.p className="hero-sub"
+            initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:.35}}>
+            Smart Admin generates conflict-free timetables, manages exam schedules,
+            and exports beautiful PDFs — automatically. Built for African schools
+            across Cambridge, UNEB, IB, and CBC curricula.
           </motion.p>
-
-          {/* CTAs */}
-          <motion.div className="home-hero-ctas"
-            initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
-            transition={{ duration:0.5, delay:0.5 }}>
-            <button
-              className="home-cta-primary"
-              onClick={handleTryDemo}
-              disabled={demoLoading}
-              style={{border:'none',cursor:'pointer'}}>
-              {demoLoading ? 'Signing in…' : <><Zap size={16} fill="currentColor"/> Try live demo</>}
-            </button>
-            <Link to="/signup" className="home-cta-secondary">
-              Create free account <ArrowRight size={15}/>
-            </Link>
+          <motion.div className="hero-actions"
+            initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:.5}}>
+            {user ? (
+              <button className="hero-btn-primary" onClick={() => navigate('/dashboard')}>
+                Go to Dashboard <ArrowRight size={16}/>
+              </button>
+            ) : (
+              <>
+                <Link to="/signup" className="hero-btn-primary">
+                  Get Started Free <ArrowRight size={16}/>
+                </Link>
+                <button className="hero-btn-ghost" onClick={handleDemo}>
+                  <Play size={15}/> Try Demo
+                </button>
+              </>
+            )}
           </motion.div>
-
-          {/* Stats row */}
-          <motion.div className="home-hero-stats"
-            initial={{ opacity:0 }} animate={{ opacity:1 }}
-            transition={{ delay:0.7 }}>
-            {STATS.map(s => (
-              <div key={s.label} className="home-hero-stat">
-                <div className="home-hero-stat-val">{s.value}</div>
-                <div className="home-hero-stat-lbl">{s.label}</div>
-              </div>
-            ))}
+          <motion.div className="hero-trust"
+            initial={{opacity:0}} animate={{opacity:1}} transition={{delay:.7}}>
+            <CheckCircle size={13} color="#10b981"/> No credit card
+            <CheckCircle size={13} color="#10b981"/> Free forever on Render
+            <CheckCircle size={13} color="#10b981"/> Setup in 10 minutes
           </motion.div>
         </motion.div>
 
-        {/* Demo credentials note */}
-        <motion.div className="home-demo-note"
-          initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.9}}>
-          Demo credentials: <strong>admin</strong> / <strong>admin123</strong>
-          {' '}— or{' '}
-          <Link to="/login" className="home-demo-link">sign in with your own account</Link>
-        </motion.div>
-
-        {/* Scroll hint */}
-        <motion.div className="home-scroll-hint"
-          animate={{ y:[0,6,0] }} transition={{ duration:1.8, repeat:Infinity }}>
-          <ChevronDown size={18} />
+        {/* Stats bar */}
+        <motion.div className="home-stats-bar"
+          initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{delay:.6}}>
+          {STATS.map(s => (
+            <div key={s.label} className="home-stat">
+              <span className="home-stat-val">{s.value}</span>
+              <span className="home-stat-lbl">{s.label}</span>
+            </div>
+          ))}
         </motion.div>
       </section>
 
-      {/* ── FEATURE GRID ────────────────────────────────────────────────── */}
+      {/* ── Demo video section ────────────────────────────────────────── */}
+      <section className="home-section home-demo-section">
+        <div className="home-section-inner">
+          <motion.div className="home-section-label"
+            initial={{opacity:0}} whileInView={{opacity:1}} viewport={{once:true}}>
+            See it in action
+          </motion.div>
+          <motion.h2 className="home-section-title"
+            initial={{opacity:0,y:16}} whileInView={{opacity:1,y:0}} viewport={{once:true}}>
+            Watch a timetable get generated<br/>
+            <span style={{color:'#f59e0b'}}>in real time</span>
+          </motion.h2>
+          <motion.p className="home-section-sub"
+            initial={{opacity:0}} whileInView={{opacity:1}} viewport={{once:true}} transition={{delay:.1}}>
+            From zero to a full conflict-free timetable in under 20 seconds.
+            No configuration. No manual effort.
+          </motion.p>
+          <motion.div
+            initial={{opacity:0,y:30,scale:.97}}
+            whileInView={{opacity:1,y:0,scale:1}}
+            viewport={{once:true}} transition={{delay:.15,duration:.6}}>
+            <DemoVideo/>
+          </motion.div>
+          <motion.div className="demo-cta"
+            initial={{opacity:0}} whileInView={{opacity:1}} viewport={{once:true}} transition={{delay:.3}}>
+            <Link to="/signup" className="hero-btn-primary" style={{fontSize:14}}>
+              Try it yourself — free <ArrowRight size={14}/>
+            </Link>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── Features ─────────────────────────────────────────────────── */}
       <section id="features" className="home-section home-features-section">
         <div className="home-section-inner">
-          <motion.div className="home-section-header"
-            initial={{ opacity:0, y:24 }} whileInView={{ opacity:1, y:0 }}
-            viewport={{ once:true }} transition={{ duration:0.6 }}>
-            <div className="home-section-pill">Everything you need</div>
-            <h2 className="home-section-h2">Built for real schools</h2>
-            <p className="home-section-lead">Every feature was designed around the actual constraints schools face — not a generic scheduling tool.</p>
-          </motion.div>
-
+          <div className="home-section-label">Everything you need</div>
+          <h2 className="home-section-title">Built for the real school day</h2>
+          <p className="home-section-sub">
+            Every feature was designed around how schools actually work — not how software thinks they do.
+          </p>
           <div className="home-features-grid">
-            {FEATURES.map((f, i) => (
+            {FEATURES.map((f,i) => (
               <motion.div key={f.title} className="home-feature-card"
-                initial={{ opacity:0, y:32 }} whileInView={{ opacity:1, y:0 }}
-                viewport={{ once:true }} transition={{ duration:0.5, delay: i * 0.08 }}
-                whileHover={{ y:-4, boxShadow:'0 20px 50px rgba(15,31,61,0.12)' }}>
-                <div className="home-feature-icon" style={{ background:f.bg, color:f.color }}>
+                initial={{opacity:0,y:20}} whileInView={{opacity:1,y:0}}
+                viewport={{once:true}} transition={{delay:i*.07}}>
+                <div className="home-feature-icon" style={{background:f.bg,color:f.color}}>
                   {f.icon}
                 </div>
                 <h3 className="home-feature-title">{f.title}</h3>
@@ -220,26 +366,68 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
+      {/* ── How it works ─────────────────────────────────────────────── */}
       <section id="how-it-works" className="home-section home-steps-section">
         <div className="home-section-inner">
-          <motion.div className="home-section-header"
-            initial={{ opacity:0, y:24 }} whileInView={{ opacity:1, y:0 }}
-            viewport={{ once:true }} transition={{ duration:0.6 }}>
-            <div className="home-section-pill">Simple process</div>
-            <h2 className="home-section-h2">From setup to schedule in 4 steps</h2>
-          </motion.div>
-
-          <div className="home-steps">
-            {STEPS.map((s, i) => (
+          <div className="home-section-label">Simple process</div>
+          <h2 className="home-section-title">Up and running in 4 steps</h2>
+          <div className="home-steps-grid">
+            {STEPS.map((s,i) => (
               <motion.div key={s.n} className="home-step"
-                initial={{ opacity:0, x: i%2===0 ? -30 : 30 }}
-                whileInView={{ opacity:1, x:0 }}
-                viewport={{ once:true }} transition={{ duration:0.55, delay: i*0.1 }}>
+                initial={{opacity:0,x:-16}} whileInView={{opacity:1,x:0}}
+                viewport={{once:true}} transition={{delay:i*.1}}>
                 <div className="home-step-num">{s.n}</div>
-                <div className="home-step-body">
+                <div>
                   <h3 className="home-step-title">{s.title}</h3>
-                  <p className="home-step-text">{s.body}</p>
+                  <p className="home-step-body">{s.body}</p>
+                </div>
+                {i < STEPS.length-1 && <div className="home-step-arrow"><ChevronRight size={20}/></div>}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Curriculum support ────────────────────────────────────────── */}
+      <section id="pricing" className="home-section home-curriculum-section">
+        <div className="home-section-inner">
+          <div className="home-section-label">Multi-curriculum</div>
+          <h2 className="home-section-title">Works with every curriculum</h2>
+          <p className="home-section-sub">
+            Built from the ground up to support the way schools across Africa and beyond actually teach.
+          </p>
+          <div className="home-curriculum-pills">
+            {CURRICULUM.map(c => (
+              <motion.div key={c} className="home-curriculum-pill"
+                initial={{opacity:0,scale:.9}} whileInView={{opacity:1,scale:1}}
+                viewport={{once:true}}>
+                <CheckCircle size={14} color="#10b981"/>{c}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ─────────────────────────────────────────────── */}
+      <section id="testimonials" className="home-section home-testimonials-section">
+        <div className="home-section-inner">
+          <div className="home-section-label">Real schools, real results</div>
+          <h2 className="home-section-title">What educators say</h2>
+          <div className="home-testimonials-grid">
+            {TESTIMONIALS.map((t,i) => (
+              <motion.div key={t.name} className="home-testimonial-card"
+                initial={{opacity:0,y:20}} whileInView={{opacity:1,y:0}}
+                viewport={{once:true}} transition={{delay:i*.1}}>
+                <Stars n={t.rating}/>
+                <p className="home-testimonial-text">"{t.text}"</p>
+                <div className="home-testimonial-author">
+                  <div className="home-testimonial-avatar">
+                    {t.name.split(' ').map(w=>w[0]).join('').slice(0,2)}
+                  </div>
+                  <div>
+                    <div className="home-testimonial-name">{t.name}</div>
+                    <div className="home-testimonial-role">{t.role} · {t.school}</div>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -247,94 +435,42 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── ABOUT / VALUE PROP ──────────────────────────────────────────── */}
-      <section id="about" className="home-section home-about-section">
-        <div className="home-section-inner home-about-inner">
-          <motion.div className="home-about-text"
-            initial={{ opacity:0, x:-40 }} whileInView={{ opacity:1, x:0 }}
-            viewport={{ once:true }} transition={{ duration:0.6 }}>
-            <div className="home-section-pill">Why Smart Admin?</div>
-            <h2 className="home-section-h2 home-about-h2">Stop wrestling spreadsheets.</h2>
-            <p className="home-about-lead">Most schools still schedule by hand — copying and pasting into spreadsheets, manually checking for clashes, and distributing timetables via email attachments. Smart Admin eliminates all of that.</p>
-            <ul className="home-about-list">
-              {[
-                'Zero manual conflict checks — the engine handles it all',
-                'Teachers get their personal PDF automatically',
-                'One-click reshuffles when circumstances change mid-term',
-                'Works for any school size — from 5 teachers to 500',
-              ].map(item => (
-                <li key={item} className="home-about-li">
-                  <CheckCircle size={14} color="#10b981" style={{flexShrink:0}} />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <Link to="/signup" className="home-cta-primary" style={{marginTop:32,display:'inline-flex'}}>
-              Get started free <ArrowRight size={16} />
-            </Link>
-          </motion.div>
-
-          <motion.div className="home-about-visual"
-            initial={{ opacity:0, x:40 }} whileInView={{ opacity:1, x:0 }}
-            viewport={{ once:true }} transition={{ duration:0.6, delay:0.15 }}>
-            <div className="home-tt-preview">
-              <div className="home-tt-header">
-                <div className="home-tt-title">Class 8A — Week 1</div>
-                <div className="home-tt-badge">● Live</div>
-              </div>
-              {['Mon','Tue','Wed','Thu','Fri'].map((day, di) => (
-                <div key={day} className="home-tt-row">
-                  <div className="home-tt-day">{day}</div>
-                  {[
-                    ['Maths','Eng','Sci','Hist','PE'],
-                    ['Eng','Sci','Maths','Art','Maths'],
-                    ['Sci','Hist','Eng','Maths','Eng'],
-                    ['Hist','Art','Maths','Sci','Hist'],
-                    ['PE','Maths','Hist','Eng','Sci'],
-                  ][di].map((subj, pi) => (
-                    <motion.div key={pi} className="home-tt-cell"
-                      initial={{ opacity:0, scale:0.85 }}
-                      whileInView={{ opacity:1, scale:1 }}
-                      viewport={{ once:true }}
-                      transition={{ delay: di*0.06 + pi*0.04 }}>
-                      {subj}
-                    </motion.div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
+      {/* ── CTA ──────────────────────────────────────────────────────── */}
       <section className="home-cta-section">
-        <div className="home-section-inner">
-          <motion.div className="home-cta-box"
-            initial={{ opacity:0, y:30 }} whileInView={{ opacity:1, y:0 }}
-            viewport={{ once:true }} transition={{ duration:0.65 }}>
-            <img src="/logo.png" alt="" className="home-cta-logo" />
-            <h2 className="home-cta-h2">Ready to reclaim your Sundays?</h2>
-            <p className="home-cta-sub">Join schools that generate conflict-free timetables in under 3 seconds.</p>
-            <div className="home-hero-ctas" style={{justifyContent:'center'}}>
-              <Link to="/signup" className="home-cta-primary">Create your school account <ArrowRight size={16} /></Link>
-              <Link to="/login" className="home-cta-secondary">Already have an account</Link>
-            </div>
-          </motion.div>
-        </div>
+        <motion.div className="home-cta-inner"
+          initial={{opacity:0,y:20}} whileInView={{opacity:1,y:0}} viewport={{once:true}}>
+          <div className="home-cta-badge"><Sparkles size={13}/> Free to deploy</div>
+          <h2 className="home-cta-title">
+            Ready to reclaim your<br/>timetabling time?
+          </h2>
+          <p className="home-cta-sub">
+            Join schools already running Smart Admin. Takes 10 minutes to set up,
+            saves hours every term.
+          </p>
+          <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap'}}>
+            <Link to="/signup" className="hero-btn-primary" style={{fontSize:15,padding:'13px 28px'}}>
+              Create Free Account <ArrowRight size={16}/>
+            </Link>
+            <button className="hero-btn-ghost" onClick={handleDemo}>
+              <Play size={14}/> View Demo First
+            </button>
+          </div>
+        </motion.div>
       </section>
 
-      {/* ── FOOTER ───────────────────────────────────────────────────────── */}
+      {/* ── Footer ───────────────────────────────────────────────────── */}
       <footer className="home-footer">
-        <div className="home-section-inner home-footer-inner">
+        <div className="home-footer-inner">
           <div className="home-footer-brand">
-            <img src="/logo.png" alt="" className="home-nav-logo" />
-            <span className="home-footer-name">Smart Admin</span>
+            <img src="/logo.png" alt="Smart Admin" style={{height:28,marginRight:8}}/>
+            <span style={{fontWeight:700,color:'rgba(255,255,255,.9)'}}>Smart Admin</span>
           </div>
-          <p className="home-footer-copy">© {new Date().getFullYear()} Smart Admin — Enterprise School Timetable Generator</p>
           <div className="home-footer-links">
-            <Link to="/login" className="home-footer-link">Sign in</Link>
-            <Link to="/signup" className="home-footer-link">Sign up</Link>
+            <Link to="/login"  style={{color:'rgba(255,255,255,.5)',fontSize:13,textDecoration:'none'}}>Sign In</Link>
+            <Link to="/signup" style={{color:'rgba(255,255,255,.5)',fontSize:13,textDecoration:'none'}}>Get Started</Link>
+          </div>
+          <div className="home-footer-copy">
+            © {new Date().getFullYear()} Smart Admin · Built with FastAPI + React
           </div>
         </div>
       </footer>
