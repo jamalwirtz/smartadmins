@@ -12,6 +12,7 @@ services:
     healthCheckPath: /health
 
     envVars:
+      # !! CRITICAL: Must be 3.12 — 3.14 breaks bcrypt/uvloop wheels !!
       - key: PYTHON_VERSION
         value: "3.12.0"
       - key: NODE_VERSION

@@ -10,14 +10,25 @@ import { useDraftWS } from '../hooks/useWebSocket'
 import toast from 'react-hot-toast'
 import {
   Zap, RefreshCw, Lock, Unlock, Download, CheckCircle, Check,
-  Trash2, ShieldCheck, Users, Eye, Palette, X, CalendarDays
+  Trash2, ShieldCheck, Users, Eye, Palette, X, CalendarDays, Pencil, Plus
 } from 'lucide-react'
 
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday']
 const PERIODS = [1,2,3,4,5,6,7,8]
 
+// ── Slot type definitions ─────────────────────────────────────────────────────
+const SLOT_TYPES = {
+  lesson:   { label:'Lesson',    color:'#2952a3', bg:'rgba(41,82,163,.1)',   icon:'📚', dark:false },
+  break:    { label:'Break',     color:'#f59e0b', bg:'rgba(245,158,11,.12)', icon:'☕', dark:false },
+  lunch:    { label:'Lunch',     color:'#10b981', bg:'rgba(16,185,129,.12)', icon:'🍽️', dark:false },
+  assembly: { label:'Assembly',  color:'#8b5cf6', bg:'rgba(139,92,246,.12)', icon:'🎓', dark:false },
+  devotion: { label:'Devotion',  color:'#f97316', bg:'rgba(249,115,22,.12)', icon:'🙏', dark:false },
+  event:    { label:'Event',     color:'#ec4899', bg:'rgba(236,72,153,.12)', icon:'📌', dark:false },
+  free:     { label:'Free',      color:'#64748b', bg:'rgba(100,116,139,.1)', icon:'💤', dark:false },
+}
+
 // ── Draggable timetable cell ──────────────────────────────────────────────────
-function TimetableCell({ slot, onLock, isDragging }) {
+function TimetableCell({ slot, onLock, onEditSlot }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: slot?.id || '__empty__',
     disabled: !slot || slot.is_locked,
@@ -25,7 +36,7 @@ function TimetableCell({ slot, onLock, isDragging }) {
   })
 
   const style = transform
-    ? { transform: `translate(${transform.x}px,${transform.y}px)`, zIndex: 999, opacity: 0.85 }
+    ? { transform: `translate(${transform.x}px,${transform.y}px)`, zIndex:999, opacity:0.85 }
     : {}
 
   if (!slot) {
@@ -36,41 +47,54 @@ function TimetableCell({ slot, onLock, isDragging }) {
     )
   }
 
-  const bg = slot.subject_color ? `${slot.subject_color}1a` : '#f0f4ff'
-  const border = slot.subject_color ? `${slot.subject_color}40` : 'var(--border)'
+  const stype    = SLOT_TYPES[slot.slot_type] || SLOT_TYPES.lesson
+  const isSpecial = slot.slot_type && slot.slot_type !== 'lesson'
+  const bg       = isSpecial ? stype.bg
+    : slot.subject_color ? `${slot.subject_color}1a` : '#f0f4ff'
+  const border   = isSpecial ? `${stype.color}55`
+    : slot.subject_color ? `${slot.subject_color}40` : 'var(--border)'
+  const textCol  = isSpecial ? stype.color : (slot.subject_color || 'var(--navy-900)')
 
   return (
     <motion.div
       ref={setNodeRef}
-      className={`tt-cell${slot.is_locked ? ' locked' : ''}`}
-      style={{ background: bg, borderColor: border, ...style }}
-      layout
-      initial={{ opacity:0, scale:0.9 }}
-      animate={{ opacity:1, scale:1 }}
-      exit={{ opacity:0, scale:0.8 }}
-      transition={{ duration: 0.2 }}
-      {...(slot.is_locked ? {} : { ...attributes, ...listeners })}
-    >
-      <div className="tt-cell-subject" style={{ color: slot.subject_color || 'var(--navy-900)' }}>
-        {slot.subject_name}
-      </div>
-      <div className="tt-cell-teacher">{slot.teacher_name}</div>
-      {slot.class_name && <div className="tt-cell-class">{slot.class_name}</div>}
+      className={`tt-cell${slot.is_locked ? ' locked' : ''}${isSpecial ? ' tt-cell-special' : ''}`}
+      style={{ background:bg, borderColor:border, ...style }}
+      layout initial={{ opacity:0, scale:0.9 }}
+      animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.8 }}
+      transition={{ duration:0.2 }}
+      {...(slot.is_locked ? {} : { ...attributes, ...listeners })}>
 
-      {/* Lock toggle */}
-      <button
-        onClick={e => { e.stopPropagation(); onLock(slot) }}
-        title={slot.is_locked ? 'Unlock slot' : 'Lock slot'}
-        style={{
-          position:'absolute', bottom:5, right:5,
-          background:'none', border:'none', cursor:'pointer',
-          padding:2, opacity:0.5, transition:'opacity 0.1s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.opacity=1}
-        onMouseLeave={e => e.currentTarget.style.opacity=0.5}
-      >
-        {slot.is_locked ? <Lock size={9} color="var(--amber)" /> : <Unlock size={9} color="var(--muted)" />}
-      </button>
+      {isSpecial ? (
+        <div className="tt-cell-special-inner">
+          <span className="tt-cell-type-icon">{stype.icon}</span>
+          <span className="tt-cell-type-label" style={{ color: textCol }}>
+            {slot.event_label || stype.label}
+          </span>
+        </div>
+      ) : (
+        <>
+          <div className="tt-cell-subject" style={{ color: textCol }}>
+            {slot.subject_name}
+          </div>
+          <div className="tt-cell-teacher">{slot.teacher_name}</div>
+          {slot.class_name && <div className="tt-cell-class">{slot.class_name}</div>}
+        </>
+      )}
+      {slot.notes && <div className="tt-cell-note-dot" title={slot.notes}>📝</div>}
+
+      <div className="tt-cell-btns">
+        <button className="tt-lock-btn"
+          onClick={e => { e.stopPropagation(); onLock(slot) }}
+          title={slot.is_locked ? 'Unlock slot' : 'Lock slot'}>
+          {slot.is_locked ? <Lock size={9} color="var(--amber)"/> : <Unlock size={9} color="var(--muted)"/>}
+        </button>
+        <button className="tt-edit-slot-btn"
+          onClick={e => { e.stopPropagation(); onEditSlot && onEditSlot(slot) }}
+          title="Change slot type">
+          <Pencil size={9}/>
+        </button>
+      </div>
     </motion.div>
   )
 }

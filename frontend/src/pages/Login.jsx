@@ -53,6 +53,23 @@ export default function Login() {
           transition={{ duration:o.dur, repeat:Infinity, ease:'easeInOut', delay:o.delay||0 }} />
       ))}
 
+      {/* Back to home */}
+      <motion.div style={{ position:'fixed', top:20, left:24, zIndex:10 }}
+        initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}} transition={{delay:.2}}>
+        <Link to="/" style={{
+          display:'flex', alignItems:'center', gap:7,
+          color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:600,
+          textDecoration:'none', padding:'7px 14px',
+          background:'rgba(255,255,255,.08)',
+          borderRadius:20, border:'1px solid rgba(255,255,255,.12)',
+          backdropFilter:'blur(8px)', transition:'all .15s',
+        }}
+        onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,255,255,.15)'; e.currentTarget.style.color='#fff' }}
+        onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,.08)'; e.currentTarget.style.color='rgba(255,255,255,.7)' }}>
+          ← Back to Home
+        </Link>
+      </motion.div>
+
       <div className="login-layout">
 
         {/* ── Hero panel ── */}
@@ -81,24 +98,7 @@ export default function Login() {
         </motion.div>
 
         {/* ── Auth card ── */}
-        {/* Back to home */}
-      <motion.div style={{ position:'fixed', top:20, left:24, zIndex:10 }}
-        initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}} transition={{delay:.2}}>
-        <Link to="/" style={{
-          display:'flex', alignItems:'center', gap:7,
-          color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:600,
-          textDecoration:'none', padding:'7px 14px',
-          background:'rgba(255,255,255,.08)',
-          borderRadius:20, border:'1px solid rgba(255,255,255,.12)',
-          backdropFilter:'blur(8px)', transition:'all .15s',
-        }}
-        onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,255,255,.15)'; e.currentTarget.style.color='#fff' }}
-        onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,.08)'; e.currentTarget.style.color='rgba(255,255,255,.7)' }}>
-          ← Back to Home
-        </Link>
-      </motion.div>
-
-      <motion.div className="login-card"
+        <motion.div className="login-card"
           initial={{ opacity:0, x:60, scale:0.96 }} animate={{ opacity:1, x:0, scale:1 }}
           transition={{ duration:0.6, delay:0.1, ease:[0.4,0,0.2,1] }}>
 
@@ -191,6 +191,34 @@ export default function Login() {
               </AnimatePresence>
             </motion.button>
           </form>
+
+          {/* Demo credentials */}
+          <motion.div
+            initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.54 }}
+            style={{
+              margin:'12px 0', padding:'10px 14px',
+              background:'rgba(245,158,11,.07)',
+              border:'1px solid rgba(245,158,11,.2)',
+              borderRadius:10, fontSize:12, color:'rgba(255,255,255,.65)',
+              display:'flex', alignItems:'center', gap:10,
+            }}>
+            <span style={{fontSize:16}}>💡</span>
+            <span>
+              <strong style={{color:'#f59e0b'}}>Demo:</strong>{' '}
+              username <code style={{background:'rgba(255,255,255,.1)',padding:'1px 5px',borderRadius:4}}>admin</code>{' '}
+              / password <code style={{background:'rgba(255,255,255,.1)',padding:'1px 5px',borderRadius:4}}>admin123</code>
+              <button
+                style={{
+                  marginLeft:8, background:'rgba(245,158,11,.2)',
+                  border:'1px solid rgba(245,158,11,.4)',
+                  color:'#f59e0b', borderRadius:6, padding:'2px 8px',
+                  cursor:'pointer', fontSize:11, fontWeight:700,
+                }}
+                onClick={() => setForm({ email:'admin', password:'admin123' })}>
+                Fill in
+              </button>
+            </span>
+          </motion.div>
 
           {/* Sign up link */}
           <motion.p className="auth-switch"

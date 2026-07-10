@@ -142,6 +142,10 @@ def _run_migrations():
         "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS timetable_orientation VARCHAR(12) DEFAULT 'horizontal'",
         # ExamSlot new column
         "ALTER TABLE exam_slots ADD COLUMN IF NOT EXISTS room_id VARCHAR(36)",
+        # TimetableSlot new columns for special events
+        "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS slot_type VARCHAR(30) DEFAULT 'lesson'",
+        "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS event_label VARCHAR(80)",
+        "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS event_color VARCHAR(7)",
         # Teacher new columns
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS initials VARCHAR(10)",
         "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS short_name VARCHAR(40)",

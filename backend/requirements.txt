@@ -13,7 +13,7 @@
 # WHY THESE SPECIFIC PACKAGES (Python 3.13/3.14 migration notes)
 # ─────────────────────────────────────────────────────────────────
 # passlib      REMOVED — imports `cgi` module removed in Python 3.13. ImportError
-#              on startup. Replaced with: bcrypt>=4.2 (used directly).
+#              on startup. Replaced with: bcrypt>=4.2.0,<5.1 (used directly).
 #
 # python-jose  REMOVED — last release 2021. CVE-2024-33663/33664. No 3.14 wheels.
 #              Replaced with: PyJWT>=2.10 (actively maintained, pure Python + C).
@@ -47,7 +47,7 @@ pydantic-settings>=2.6.0
 
 # ── [PROD] Authentication ─────────────────────────────────────────────────────
 PyJWT>=2.10.0                      # JWT — replaces python-jose
-bcrypt>=4.2.1                      # Password hashing — replaces passlib
+bcrypt>=4.2.0,<5.1                      # Password hashing — replaces passlib
 cryptography>=43.0.0               # PyJWT RS256 support + psycopg SSL
 
 # ── [PROD] PDF generation ─────────────────────────────────────────────────────

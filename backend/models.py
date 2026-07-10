@@ -127,9 +127,20 @@ class TimetableSlot(Base):
     subject_id = Column(String(36), ForeignKey("subjects.id",          ondelete="SET NULL"), nullable=True)
     day        = Column(String(12), nullable=False)
     period     = Column(Integer,    nullable=False)
-    is_locked  = Column(Boolean, default=False)
-    is_break   = Column(Boolean, default=False)
-    notes      = Column(String(200), nullable=True)
+    is_locked   = Column(Boolean,      default=False)
+    is_break    = Column(Boolean,      default=False)
+    slot_type   = Column(String(30),   default='lesson')
+    # slot_type options:
+    #   lesson   — normal class period
+    #   break    — short break/recess
+    #   lunch    — lunch period
+    #   assembly — whole-school assembly
+    #   devotion — morning devotion / chapel
+    #   event    — custom school event
+    #   free     — free period / study hall
+    event_label = Column(String(80),   nullable=True)   # custom label for assembly/devotion/event
+    event_color = Column(String(7),    nullable=True)   # hex colour for special slots
+    notes       = Column(String(200),  nullable=True)
 
     draft         = relationship("TimetableDraft",  back_populates="slots")
     class_section = relationship("ClassSection",    back_populates="timetable_slots")
