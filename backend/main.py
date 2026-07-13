@@ -227,13 +227,48 @@ def health():
 
 @app.api_route("/ping", methods=["GET", "HEAD"], tags=["Health"])
 def ping():
-    """
-    Ultra-lightweight keepalive endpoint.
-    Pin this URL in UptimeRobot (free) to ping every 5 minutes
-    and prevent Render free-tier cold starts.
-    https://uptimerobot.com — add monitor → HTTP(s) → your-app.onrender.com/ping
-    """
+    """Ultra-lightweight keepalive — use with UptimeRobot to prevent cold starts."""
     return "pong"
+
+
+@app.get("/debug/status", tags=["Health"])
+def debug_status():
+    """
+    Public endpoint — shows backend status without auth.
+    Visit https://your-app.onrender.com/debug/status to verify the backend is running.
+    """
+    import sys
+    from database import db_url, is_sqlite
+    from sqlalchemy import text
+
+    db_ok, user_count, admin_exists = False, 0, False
+    db_error = None
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        from models import User
+        user_count  = db.query(User).count()
+        admin_exists = db.query(User).filter(User.username == "admin").first() is not None
+        db.close()
+        db_ok = True
+    except Exception as e:
+        db_error = str(e)
+
+    return {
+        "status":       "running",
+        "python":       sys.version,
+        "database":     "sqlite" if is_sqlite else "postgresql",
+        "db_connected": db_ok,
+        "db_error":     db_error,
+        "users":        user_count,
+        "admin_exists": admin_exists,
+        "hint": (
+            "Backend running ✅ — try logging in with admin/admin123"
+            if admin_exists else
+            "No admin user found — check Render logs for seed errors"
+        ),
+    }
 
 
 # ── Serve React frontend (production) ─────────────────────────────────────────
