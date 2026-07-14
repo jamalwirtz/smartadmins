@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 import {
   CalendarDays, Users, BookOpen, FileDown, Zap, Lock, Globe,
   ArrowRight, CheckCircle, Star, LogIn, Play, Pause,
@@ -89,12 +90,22 @@ function HomeNav() {
 function DemoVideo() {
   const [playing, setPlaying] = useState(false)
   const [hovered, setHovered] = useState(false)
+  // If /demo.mp4 doesn't exist or fails to load/play, we fall back to the
+  // animated CSS timetable preview instead of showing a dead Play button
+  // sitting on top of it.
+  const [videoAvailable, setVideoAvailable] = useState(true)
   const videoRef = useRef(null)
 
   const toggle = () => {
-    if (!videoRef.current) return
-    if (playing) { videoRef.current.pause(); setPlaying(false) }
-    else         { videoRef.current.play().then(() => setPlaying(true)).catch(() => {}) }
+    if (!videoAvailable || !videoRef.current) return
+    if (playing) {
+      videoRef.current.pause()
+      setPlaying(false)
+    } else {
+      videoRef.current.play()
+        .then(() => setPlaying(true))
+        .catch(() => setVideoAvailable(false))
+    }
   }
 
   return (
@@ -114,37 +125,43 @@ function DemoVideo() {
           <div className="demo-browser-url">smartadmin.onrender.com/timetable</div>
         </div>
         <div className="demo-browser-body">
-          {/* Video element — replace src with your actual screen recording */}
-          <video
-            ref={videoRef}
-            className="demo-video-el"
-            src="/demo.mp4"
-            playsInline muted loop
-            poster="/demo-poster.png"
-            onEnded={() => setPlaying(false)}
-            onError={() => {}}
-          />
+          {/* Video element — only rendered while we believe a real file exists.
+              Add your own screen recording at frontend/public/demo.mp4 to activate it. */}
+          {videoAvailable && (
+            <video
+              ref={videoRef}
+              className="demo-video-el"
+              src="/demo.mp4"
+              playsInline muted loop
+              poster="/demo-poster.png"
+              onEnded={() => setPlaying(false)}
+              onError={() => setVideoAvailable(false)}
+            />
+          )}
 
-          {/* Animated UI preview (shown when no video file) */}
-          <div className="demo-ui-preview">
+          {/* Animated UI preview (fallback + always shown until real video plays) */}
+          <div className="demo-ui-preview"
+            style={videoAvailable && playing ? { opacity: 0, pointerEvents: 'none' } : undefined}>
             <AnimatedTimetable/>
           </div>
 
-          {/* Play/pause overlay */}
-          <motion.div className="demo-play-overlay"
-            animate={{ opacity: hovered || !playing ? 1 : 0 }}
-            transition={{ duration: .2 }}
-            onClick={toggle}>
-            <motion.button className="demo-play-btn"
-              whileHover={{ scale:1.08 }} whileTap={{ scale:.94 }}>
-              {playing ? <Pause size={28}/> : <Play size={28} style={{marginLeft:3}}/>}
-            </motion.button>
-            {!playing && (
-              <div className="demo-play-label">
-                Watch the 20-second demo
-              </div>
-            )}
-          </motion.div>
+          {/* Play/pause overlay — only shown when a real video is available */}
+          {videoAvailable && (
+            <motion.div className="demo-play-overlay"
+              animate={{ opacity: hovered || !playing ? 1 : 0 }}
+              transition={{ duration: .2 }}
+              onClick={toggle}>
+              <motion.button className="demo-play-btn"
+                whileHover={{ scale:1.08 }} whileTap={{ scale:.94 }}>
+                {playing ? <Pause size={28}/> : <Play size={28} style={{marginLeft:3}}/>}
+              </motion.button>
+              {!playing && (
+                <div className="demo-play-label">
+                  Watch the 20-second demo
+                </div>
+              )}
+            </motion.div>
+          )}
         </div>
       </div>
     </div>
@@ -226,20 +243,34 @@ function Stars({ n }) {
 
 /* ── Main ─────────────────────────────────────────────────────────────── */
 export default function Home() {
-  const { user } = useAuth()
+  const { user, login } = useAuth()
   const navigate  = useNavigate()
   const heroRef   = useRef(null)
   const { scrollYProgress } = useScroll({ target: heroRef, offset:['start start','end start'] })
   const heroY     = useTransform(scrollYProgress, [0,1], ['0%','30%'])
   const heroOpac  = useTransform(scrollYProgress, [0,.7], [1,0])
+  const [demoLoading, setDemoLoading] = useState(false)
 
+  // FIX: previously this called authAPI.login() directly and only wrote the
+  // token to localStorage. AuthContext's `user` state was never updated, so
+  // ProtectedLayout immediately redirected back to /login (looked like the
+  // demo credentials "weren't found"). Using the context's login() keeps
+  // everything — token, user state, profile photo — in sync.
   const handleDemo = async () => {
+    setDemoLoading(true)
     try {
-      const { authAPI } = await import('../api/client')
-      const r  = await authAPI.login('admin','admin123')
-      localStorage.setItem('sstg_token', r.data.access_token)
+      await login('admin', 'admin123')
+      toast.success('Signed in as demo admin ✅')
       navigate('/dashboard')
-    } catch { navigate('/login') }
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.detail ||
+        'Demo login failed — make sure the backend is running.'
+      )
+      navigate('/login')
+    } finally {
+      setDemoLoading(false)
+    }
   }
 
   return (
@@ -284,8 +315,10 @@ export default function Home() {
                 <Link to="/signup" className="hero-btn-primary">
                   Get Started Free <ArrowRight size={16}/>
                 </Link>
-                <button className="hero-btn-ghost" onClick={handleDemo}>
-                  <Play size={15}/> Try Demo
+                <button className="hero-btn-ghost" onClick={handleDemo} disabled={demoLoading}>
+                  {demoLoading
+                    ? <><div className="login-spinner" style={{ width:14, height:14, borderWidth:2 }}/> Signing in…</>
+                    : <><Play size={15}/> Try Demo</>}
                 </button>
               </>
             )}
@@ -451,8 +484,10 @@ export default function Home() {
             <Link to="/signup" className="hero-btn-primary" style={{fontSize:15,padding:'13px 28px'}}>
               Create Free Account <ArrowRight size={16}/>
             </Link>
-            <button className="hero-btn-ghost" onClick={handleDemo}>
-              <Play size={14}/> View Demo First
+            <button className="hero-btn-ghost" onClick={handleDemo} disabled={demoLoading}>
+              {demoLoading
+                ? <><div className="login-spinner" style={{ width:14, height:14, borderWidth:2 }}/> Signing in…</>
+                : <><Play size={14}/> View Demo First</>}
             </button>
           </div>
         </motion.div>
