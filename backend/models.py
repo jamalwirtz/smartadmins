@@ -155,14 +155,14 @@ class ExamPaper(Base):
     """
     __tablename__ = "exam_papers"
     __table_args__ = (UniqueConstraint("subject_id", "paper_number"),)
-    
+
     id           = Column(String(36), primary_key=True, default=_uuid)
     subject_id   = Column(String(36), ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
     paper_number = Column(Integer, nullable=False)  # 1-6
     duration_minutes = Column(Integer, default=120)  # e.g., 2 hours = 120 mins
     is_practical = Column(Boolean, default=False)
     created_at   = Column(DateTime(timezone=True), default=_now)
-    
+
     subject      = relationship("Subject", foreign_keys=[subject_id])
     exam_slots   = relationship("ExamSlot", back_populates="paper", cascade="all, delete-orphan")
 
@@ -176,22 +176,32 @@ class ExamSlot(Base):
         UniqueConstraint("exam_session_id", "class_id", "paper_id", name="uq_exam_slot"),
         UniqueConstraint("exam_session_id", "class_id", "day", "period", name="uq_exam_time"),
     )
-    
+
     id               = Column(String(36), primary_key=True, default=_uuid)
     exam_session_id  = Column(String(36), ForeignKey("exam_sessions.id", ondelete="CASCADE"), nullable=False)
     paper_id         = Column(String(36), ForeignKey("exam_papers.id", ondelete="CASCADE"), nullable=False)
     class_id         = Column(String(36), ForeignKey("class_sections.id", ondelete="CASCADE"), nullable=False)
     day              = Column(String(12), nullable=False)
     period           = Column(Integer, nullable=False)
-    invigilator_id   = Column(String(36), ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
+    # FIX: this used to have ForeignKey("teachers.id") while Supervisor.exam_slots
+    # tried to join through this same column expecting it to reference
+    # supervisors.id — SQLAlchemy couldn't resolve that join, and it crashed
+    # ALL mapper configuration on startup (this is what produced
+    # db_connected:false regardless of which real database was configured).
+    invigilator_id   = Column(String(36), ForeignKey("supervisors.id", ondelete="SET NULL"), nullable=True)
     room             = Column(String(80), nullable=True)  # e.g., "Science Lab", "Hall A"
+    room_id          = Column(String(36), ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True)
     is_locked        = Column(Boolean, default=False)
     notes            = Column(String(200), nullable=True)
-    
+
     exam_session = relationship("ExamSession", back_populates="slots")
     paper        = relationship("ExamPaper", back_populates="exam_slots")
     class_section= relationship("ClassSection")
-    invigilator  = relationship("Teacher")
+    # FIX: now points at Supervisor (matching the corrected FK above) instead
+    # of Teacher, using a clean back_populates pair with Supervisor.exam_slots
+    # below instead of the old foreign_keys=/backref=/overlaps= workaround.
+    invigilator  = relationship("Supervisor", back_populates="exam_slots")
+    room_ref     = relationship("Room", foreign_keys=[room_id])
 
 
 class ExamSession(Base):
@@ -199,7 +209,7 @@ class ExamSession(Base):
     An exam timetable session (e.g., "June 2024 Final Exams").
     """
     __tablename__ = "exam_sessions"
-    
+
     id          = Column(String(36), primary_key=True, default=_uuid)
     name        = Column(String(80), nullable=False)
     description = Column(String(300), nullable=True)
@@ -208,7 +218,7 @@ class ExamSession(Base):
     status      = Column(String(20), default="draft")  # draft | published | completed
     created_at  = Column(DateTime(timezone=True), default=_now)
     updated_at  = Column(DateTime(timezone=True), default=_now, onupdate=_now)
-    
+
     slots = relationship("ExamSlot", back_populates="exam_session", cascade="all, delete-orphan")
 
 
@@ -334,7 +344,6 @@ class Supervisor(Base):
     is_active    = Column(Boolean,     default=True)
     created_at   = Column(DateTime(timezone=True), default=_now)
 
-    exam_slots = relationship("ExamSlot",
-                              foreign_keys="ExamSlot.invigilator_id",
-                              backref="supervisor_rel",
-                              overlaps="invigilator")
+    # FIX: simple back_populates pair with ExamSlot.invigilator now that the
+    # foreign key on ExamSlot.invigilator_id correctly targets supervisors.id.
+    exam_slots = relationship("ExamSlot", back_populates="invigilator")
