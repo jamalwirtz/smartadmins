@@ -1,588 +1,1080 @@
-"""
-SSTG — Exam scheduling API
-===========================
-Manages exam sessions, papers per subject, and generates
-conflict-free, load-balanced exam timetables.
-"""
-from __future__ import annotations
+import AIAssistant from '../components/AIAssistant'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Plus, Calendar, ArrowLeft, Check, X, Lock, Unlock,
+  BookOpen, Clock, CheckCircle2, RefreshCw, Play,
+  Download, FileSpreadsheet, FileText, Trash2,
+  Layers, ChevronDown, AlertTriangle, Info,
+  GraduationCap, FlaskConical, Zap, User, MapPin, Pencil
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+import { examsAPI, subjectsAPI, classesAPI, teachersAPI,
+         exportAPI, templatesAPI, supervisorsAPI, roomsAPI } from '../api/client'
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+// ── Constants ─────────────────────────────────────────────────────────────────
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday']
 
-from database import get_db
-from security import get_current_user
-from models import (
-    ExamSession, ExamPaper, ExamSlot,
-    Subject, ClassSection, Teacher, User,
+const STATUS = {
+  draft:     { bg:'rgba(99,102,241,.13)',  text:'#818cf8', dot:'#6366f1', label:'Draft'     },
+  published: { bg:'rgba(16,185,129,.13)',  text:'#34d399', dot:'#10b981', label:'Published' },
+  completed: { bg:'rgba(107,114,128,.13)', text:'#9ca3af', dot:'#6b7280', label:'Completed' },
+}
+
+// ── Tiny reusable components ──────────────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+  const s = STATUS[status] || STATUS.draft
+  return (
+    <span className="exam-badge" style={{ background: s.bg, color: s.text }}>
+      <span style={{ width:6, height:6, borderRadius:'50%', background: s.dot,
+        display:'inline-block', marginRight:5 }} />
+      {s.label}
+    </span>
+  )
+}
+
+const Loader = ({ text = 'Loading…' }) => (
+  <div className="exam-loader">
+    <motion.div className="exam-loader-ring"
+      animate={{ rotate: 360 }} transition={{ duration:1, repeat:Infinity, ease:'linear' }} />
+    <span className="exam-loader-text">{text}</span>
+  </div>
 )
 
-router = APIRouter(tags=["Exams"])
+const EmptyState = ({ icon: Icon, title, body, action, onAction }) => (
+  <motion.div className="exam-empty" initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}>
+    <div className="exam-empty-icon"><BookOpen size={36} /></div>
+    <h3 className="exam-empty-title">{title}</h3>
+    <p className="exam-empty-body">{body}</p>
+    {action && (
+      <button className="btn btn-accent" onClick={onAction}>
+        <Plus size={14} /> {action}
+      </button>
+    )}
+  </motion.div>
+)
 
+// Download helper
+const triggerDownload = (blob, filename) => {
+  const url = URL.createObjectURL(blob)
+  const a   = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
-# ── Local Pydantic schemas (kept in this file to avoid circular imports) ──────
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function Exams() {
+  // navigation
+  const [view,    setView]    = useState('list')  // list | papers | session
+  const [active,  setActive]  = useState(null)
 
-class SessionCreate(BaseModel):
-    name:        str
-    description: Optional[str] = None
-    start_date:  str = Field(..., example="2024-06-01")
-    end_date:    str = Field(..., example="2024-06-30")
+  // data
+  const [sessions,   setSessions]   = useState([])
+  const [subjects,   setSubjects]   = useState([])
+  const [classes,    setClasses]    = useState([])
+  const [papersData, setPapersData] = useState([])
+  const [supervisors, setSupervisors] = useState([])
+  const [rooms,       setRooms]       = useState([])
+  const [editingSlot, setEditingSlot] = useState(null)  // id of the slot currently in edit mode
+  const [examTpls,   setExamTpls]   = useState([])
+  const [ttTpls,     setTtTpls]     = useState([])
 
+  // UI state
+  const [loading,       setLoading]       = useState(true)
+  const [exporting,     setExporting]     = useState(null)     // 'pdf'|'xlsx'
+  const [showCreate,    setShowCreate]    = useState(false)
+  const [showGenerate,  setShowGenerate]  = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [showPaperFor,  setShowPaperFor]  = useState(null)
+  const [applyingTpl,   setApplyingTpl]   = useState(false)
 
-class SessionUpdate(BaseModel):
-    name:        Optional[str] = None
-    description: Optional[str] = None
-    start_date:  Optional[str] = None
-    end_date:    Optional[str] = None
-    status:      Optional[str] = None  # draft | published | completed
+  // forms
+  const [createForm, setCreateForm] = useState({
+    name:'', start_date:'', end_date:'', description:''
+  })
+  const [genForm, setGenForm] = useState({
+    subject_ids:[], class_ids:[], start_period:1, max_per_day:1,
+    school_days:[...DAYS],
+    include_supervisors: true,
+    include_rooms:       true,
+  })
+  const [tplApplyForm, setTplApplyForm] = useState({
+    template_id:'', session_name:'', start_date:'', end_date:'',
+    class_ids:[], subject_ids:[],
+  })
 
+  // ── loaders ─────────────────────────────────────────────────────────────
+  const loadSessions = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await examsAPI.listSessions()
+      setSessions(r.data)
+    } catch { toast.error('Could not load exam sessions') }
+    finally { setLoading(false) }
+  }, [])
 
-class PaperCreate(BaseModel):
-    paper_number:     int  = Field(..., ge=1, le=6)
-    duration_minutes: int  = Field(120, ge=30, le=300)
-    is_practical:     bool = False
+  const loadSession = useCallback(async (id) => {
+    setLoading(true)
+    try {
+      const r = await examsAPI.getSession(id)
+      setActive(r.data)
+    } catch { toast.error('Could not load session') }
+    finally { setLoading(false) }
+  }, [])
 
+  const loadSupport = useCallback(async () => {
+    try {
+      const [s, c, p, et, sv, rm] = await Promise.all([
+        subjectsAPI.list(), classesAPI.list(),
+        examsAPI.allPapers(), templatesAPI.examTemplates(),
+        supervisorsAPI.list().catch(() => ({ data:[] })),
+        roomsAPI.list().catch(() => ({ data:[] })),
+      ])
+      setSubjects(s.data); setClasses(c.data)
+      setPapersData(p.data); setExamTpls(et.data)
+      setSupervisors(sv.data); setRooms(rm.data)
+      setGenForm(f => ({
+        ...f,
+        subject_ids: s.data.map(x => x.id),
+        class_ids:   c.data.map(x => x.id),
+      }))
+      setTplApplyForm(f => ({
+        ...f,
+        class_ids:   c.data.map(x => x.id),
+        subject_ids: s.data.map(x => x.id),
+      }))
+    } catch { toast.error('Could not load support data') }
+  }, [])
 
-class PaperUpdate(BaseModel):
-    duration_minutes: Optional[int]  = Field(None, ge=30, le=300)
-    is_practical:     Optional[bool] = None
+  useEffect(() => { loadSessions() }, [loadSessions])
+  useEffect(() => { if (view !== 'list') loadSupport() }, [view, loadSupport])
 
+  // ── actions ──────────────────────────────────────────────────────────────
+  const handleCreateSession = async (e) => {
+    e.preventDefault()
+    if (!createForm.name.trim()) return toast.error('Session name required')
+    if (!createForm.start_date || !createForm.end_date) return toast.error('Dates required')
+    if (createForm.start_date > createForm.end_date) return toast.error('End must be after start')
+    try {
+      await examsAPI.createSession(createForm)
+      toast.success('Session created ✅')
+      setShowCreate(false)
+      setCreateForm({ name:'', start_date:'', end_date:'', description:'' })
+      loadSessions()
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Create failed') }
+  }
 
-class SlotCreate(BaseModel):
-    paper_id:       str
-    class_id:       str
-    day:            str
-    period:         int  = Field(..., ge=1)
-    invigilator_id: Optional[str] = None
-    room:           Optional[str] = None
-    notes:          Optional[str] = None
+  const handleDelete = async (id, e) => {
+    e.stopPropagation()
+    if (!window.confirm('Delete this session and all its slots?')) return
+    try {
+      await examsAPI.deleteSession(id)
+      toast.success('Deleted')
+      loadSessions()
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Delete failed') }
+  }
 
+  const handlePublish = async (id, status) => {
+    const next = status === 'draft' ? 'published' : 'draft'
+    try {
+      await examsAPI.updateSession(id, { status: next })
+      toast.success(`Session ${next}`)
+      active ? loadSession(active.id) : loadSessions()
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Update failed') }
+  }
 
-class SlotUpdate(BaseModel):
-    day:            Optional[str] = None
-    period:         Optional[int] = Field(None, ge=1)
-    invigilator_id: Optional[str] = None
-    room:           Optional[str] = None
-    is_locked:      Optional[bool] = None
-    notes:          Optional[str] = None
+  const handleGenerate = async (e) => {
+    e.preventDefault()
+    if (!genForm.subject_ids.length) return toast.error('Select at least one subject')
+    if (!genForm.class_ids.length)   return toast.error('Select at least one class')
+    if (!genForm.school_days.length) return toast.error('Select at least one day')
+    try {
+      const r = await examsAPI.generateSlots(active.id, genForm)
+      toast.success(r.data.message || `Created ${r.data.slots_created} slots ✅`, { duration:4000 })
+      setShowGenerate(false)
+      loadSession(active.id)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Generation failed', { duration:6000 }) }
+  }
 
+  const handleApplyTemplate = async (e) => {
+    e.preventDefault()
+    if (!tplApplyForm.template_id)   return toast.error('Pick a template')
+    if (!tplApplyForm.start_date)    return toast.error('Start date required')
+    if (!tplApplyForm.end_date)      return toast.error('End date required')
+    if (!tplApplyForm.class_ids.length) return toast.error('Select classes')
+    setApplyingTpl(true)
+    try {
+      const r = await templatesAPI.applyExamTemplate(tplApplyForm)
+      toast.success(`Session created with ${r.data.papers_added} papers pre-configured ✅`, { duration:5000 })
+      setShowTemplates(false)
+      // Auto-navigate to the new session
+      await loadSession(r.data.session_id)
+      setView('session')
+      // Pre-fill the generate form with the template's payload
+      setGenForm(r.data.generate_payload)
+      setShowGenerate(true)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Apply failed') }
+    finally { setApplyingTpl(false) }
+  }
 
-class GenerateRequest(BaseModel):
-    subject_ids:          List[str] = Field(..., min_length=1)
-    class_ids:            List[str] = Field(..., min_length=1)
-    start_period:         int  = Field(1, ge=1)
-    max_per_day:          int  = Field(1, ge=1, le=4)
-    include_supervisors:  bool = True
-    include_rooms:        bool = True
-    school_days:          List[str] = Field(
-        default=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    )
+  const handleAddPaper = async (subjectId, data) => {
+    try {
+      await examsAPI.addPaper(subjectId, data)
+      toast.success(`Paper ${data.paper_number} added ✅`)
+      const u = await examsAPI.allPapers()
+      setPapersData(u.data); setShowPaperFor(null)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Add paper failed') }
+  }
 
+  const handleDeletePaper = async (paperId, e) => {
+    e.stopPropagation()
+    if (!window.confirm('Delete this paper? Scheduled slots using it will also be removed.')) return
+    try {
+      await examsAPI.deletePaper(paperId)
+      toast.success('Paper deleted')
+      const u = await examsAPI.allPapers()
+      setPapersData(u.data)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Delete failed') }
+  }
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+  const handleLock = async (slotId, lock) => {
+    try {
+      await examsAPI.updateSlot(slotId, { is_locked: lock })
+      loadSession(active.id)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Update failed') }
+  }
 
-def _session_or_404(session_id: str, db: Session) -> ExamSession:
-    s = db.query(ExamSession).filter(ExamSession.id == session_id).first()
-    if not s:
-        raise HTTPException(404, "Exam session not found")
-    return s
+  const handleDeleteSlot = async (slotId) => {
+    try {
+      await examsAPI.deleteSlot(slotId)
+      loadSession(active.id)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Cannot delete locked slot') }
+  }
 
+  // FIX: this function already existed but was never passed to <ExamSlotCard>,
+  // so the whole "assign supervisor/room" feature was dead — clicking the
+  // pencil icon did nothing because onEditToggle was undefined.
+  const handleAssignSlot = async (slotId, updates) => {
+    try {
+      await examsAPI.updateSlot(slotId, updates)
+      setEditingSlot(null)
+      toast.success('Assignment saved ✅')
+      loadSession(active.id)
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Update failed') }
+  }
 
-def _slot_or_404(slot_id: str, db: Session) -> ExamSlot:
-    s = db.query(ExamSlot).filter(ExamSlot.id == slot_id).first()
-    if not s:
-        raise HTTPException(404, "Slot not found")
-    return s
+  const handleValidate = async () => {
+    try {
+      const r = await examsAPI.validateSession(active.id)
+      const { errors, warnings } = r.data
+      if (!errors.length && !warnings.length) {
+        toast.success(`All clear — ${r.data.total_slots} slots, no issues ✅`, { duration:4000 })
+      } else {
+        errors.forEach(e => toast.error(e, { duration:7000 }))
+        warnings.forEach(w => toast(`⚠️  ${w}`, { duration:5000 }))
+      }
+    } catch { toast.error('Validation failed') }
+  }
 
+  const handleExport = async (format) => {
+    if (!active) return
+    setExporting(format)
+    try {
+      const r = format === 'pdf'
+        ? await exportAPI.examPdf(active.id)
+        : await exportAPI.examXlsx(active.id)
+      const ext  = format === 'pdf' ? 'pdf' : 'xlsx'
+      const name = active.name.replace(/\s+/g, '_').replace(/[/\\]/g, '-')
+      triggerDownload(r.data, `exam_${name}.${ext}`)
+      toast.success(`Exported as ${ext.toUpperCase()} ✅`)
+    } catch { toast.error('Export failed — ensure the backend is running') }
+    finally { setExporting(null) }
+  }
 
-def _format_session(s: ExamSession) -> dict:
-    return {
-        "id":          s.id,
-        "name":        s.name,
-        "description": s.description,
-        "status":      s.status,
-        "start_date":  s.start_date,
-        "end_date":    s.end_date,
-        "slot_count":  len(s.slots),
-    }
+  // ── helpers ──────────────────────────────────────────────────────────────
+  const toggleId = (arr, id) =>
+    arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]
 
+  const buildGrid = (slots = []) => {
+    const g = {}
+    DAYS.forEach(d => { g[d] = {} })
+    slots.forEach(sl => {
+      if (!g[sl.day]) g[sl.day] = {}
+      g[sl.day][sl.period] = g[sl.day][sl.period] || []
+      g[sl.day][sl.period].push(sl)
+    })
+    return g
+  }
 
-def _format_slot(slot: ExamSlot) -> dict:
-    return {
-        "id":           slot.id,
-        "paper_id":     slot.paper_id,
-        "paper_number": slot.paper.paper_number,
-        "subject_id":   slot.paper.subject_id,
-        "subject_name": slot.paper.subject.name,
-        "subject_color":slot.paper.subject.color_hex,
-        "class_id":     slot.class_id,
-        "class_name":   slot.class_section.name,
-        "day":          slot.day,
-        "period":       slot.period,
-        "duration":     slot.paper.duration_minutes,
-        "is_practical": slot.paper.is_practical,
-        "invigilator_id":   slot.invigilator_id,
-        "invigilator_name": slot.invigilator.name if slot.invigilator else None,
-        "room":         slot.room,
-        "notes":        slot.notes,
-        "is_locked":    slot.is_locked,
-    }
+  const periods = active
+    ? [...new Set((active.slots || []).map(s => s.period))].sort((a,b) => a-b)
+    : []
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // VIEW: LIST
+  // ────────────────────────────────────────────────────────────────────────────
+  if (view === 'list') return (
+    <div className="page-container">
 
-# ── Exam Sessions ─────────────────────────────────────────────────────────────
+      {/* ── Page header ── */}
+      <motion.div className="exam-page-header"
+        initial={{ opacity:0, y:-16 }} animate={{ opacity:1, y:0 }}>
+        <div>
+          <h1 className="page-title">Exam Timetables</h1>
+          <p className="page-subtitle">Create and manage conflict-free exam schedules</p>
+        </div>
+        <div className="exam-header-actions">
+          <button className="btn btn-secondary" onClick={() => { setView('papers'); loadSupport() }}>
+            <BookOpen size={14}/> Manage Papers
+          </button>
+          <button className="btn btn-secondary" onClick={() => { setShowTemplates(true); loadSupport() }}>
+            <Layers size={14}/> From Template
+          </button>
+          <button className="btn btn-accent" onClick={() => setShowCreate(true)}>
+            <Plus size={14}/> New Session
+          </button>
+        </div>
+      </motion.div>
 
-@router.post("/exams/sessions")
-def create_session(
-    data: SessionCreate,
-    db:   Session = Depends(get_db),
-    _:    User    = Depends(get_current_user),
-):
-    if data.start_date > data.end_date:
-        raise HTTPException(400, "start_date must be before end_date")
+      {/* ── Template picker modal ── */}
+      <AnimatePresence>
+        {showTemplates && (
+          <motion.div className="exam-modal-backdrop"
+            initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            onClick={() => setShowTemplates(false)}>
+            <motion.div className="exam-modal"
+              initial={{ opacity:0, scale:.96, y:20 }}
+              animate={{ opacity:1, scale:1, y:0 }}
+              exit={{ opacity:0, scale:.96, y:20 }}
+              onClick={e => e.stopPropagation()}>
 
-    s = ExamSession(
-        name=data.name,
-        description=data.description,
-        start_date=data.start_date,
-        end_date=data.end_date,
-    )
-    db.add(s)
-    db.commit()
-    db.refresh(s)
-    return _format_session(s)
+              <div className="exam-modal-header">
+                <div>
+                  <h2 className="exam-modal-title">Exam Templates</h2>
+                  <p className="exam-modal-sub">Pick a template to pre-configure your exam session</p>
+                </div>
+                <button className="exam-modal-close" onClick={() => setShowTemplates(false)}>
+                  <X size={18}/>
+                </button>
+              </div>
 
+              {/* Template grid */}
+              <div className="exam-tpl-grid">
+                {examTpls.map(tpl => (
+                  <motion.button
+                    key={tpl.id}
+                    className={`exam-tpl-card${tplApplyForm.template_id === tpl.id ? ' selected' : ''}`}
+                    whileHover={{ y:-2 }} whileTap={{ scale:.98 }}
+                    onClick={() => setTplApplyForm(f => ({
+                      ...f, template_id: tpl.id,
+                      session_name: tpl.config.suggested_name || tpl.name,
+                    }))}>
+                    <div className="exam-tpl-icon">{tpl.icon}</div>
+                    <div className="exam-tpl-name">{tpl.name}</div>
+                    <div className="exam-tpl-desc">{tpl.description}</div>
+                    <div className="exam-tpl-pills">
+                      <span className="exam-tpl-pill">{tpl.config.duration_days}d</span>
+                      <span className="exam-tpl-pill">{tpl.config.papers_per_subject}p/subj</span>
+                      <span className="exam-tpl-pill">max {tpl.config.max_per_day}/day</span>
+                    </div>
+                    {tplApplyForm.template_id === tpl.id && (
+                      <div className="exam-tpl-check"><Check size={12}/></div>
+                    )}
+                  </motion.button>
+                ))}
+              </div>
 
-@router.get("/exams/sessions")
-def list_sessions(
-    db: Session = Depends(get_db),
-    _:  User    = Depends(get_current_user),
-):
-    sessions = db.query(ExamSession).order_by(ExamSession.start_date.desc()).all()
-    return [_format_session(s) for s in sessions]
+              {/* Apply form */}
+              {tplApplyForm.template_id && (
+                <motion.form className="exam-tpl-apply-form"
+                  initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
+                  onSubmit={handleApplyTemplate}>
+                  <div className="exam-tpl-apply-row">
+                    <div className="form-group">
+                      <label className="form-label">Session Name</label>
+                      <input className="form-input" value={tplApplyForm.session_name}
+                        onChange={e => setTplApplyForm(f=>({...f,session_name:e.target.value}))}
+                        placeholder="e.g. June 2024 Finals" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Start Date</label>
+                      <input type="date" className="form-input" value={tplApplyForm.start_date}
+                        onChange={e => setTplApplyForm(f=>({...f,start_date:e.target.value}))} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">End Date</label>
+                      <input type="date" className="form-input" value={tplApplyForm.end_date}
+                        onChange={e => setTplApplyForm(f=>({...f,end_date:e.target.value}))} />
+                    </div>
+                  </div>
+                  <div className="exam-tpl-apply-row">
+                    <div className="form-group">
+                      <label className="form-label">Classes ({tplApplyForm.class_ids.length} selected)</label>
+                      <div className="exam-check-list">
+                        {classes.map(c => (
+                          <label key={c.id} className="exam-check-item">
+                            <input type="checkbox"
+                              checked={tplApplyForm.class_ids.includes(c.id)}
+                              onChange={() => setTplApplyForm(f=>({
+                                ...f, class_ids: toggleId(f.class_ids, c.id)
+                              }))} />
+                            <span>{c.name}</span>
+                            <span className="exam-check-meta">Gr{c.grade_level}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Subjects ({tplApplyForm.subject_ids.length} selected)</label>
+                      <div className="exam-check-list">
+                        {subjects.map(s => (
+                          <label key={s.id} className="exam-check-item">
+                            <input type="checkbox"
+                              checked={tplApplyForm.subject_ids.includes(s.id)}
+                              onChange={() => setTplApplyForm(f=>({
+                                ...f, subject_ids: toggleId(f.subject_ids, s.id)
+                              }))} />
+                            <span>{s.name}</span>
+                            <span className="exam-check-meta">Gr{s.grade_level}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+                    <button type="button" className="btn btn-secondary"
+                      onClick={() => setShowTemplates(false)}>Cancel</button>
+                    <button type="submit" className="btn btn-accent" disabled={applyingTpl}>
+                      {applyingTpl
+                        ? <><div className="login-spinner" style={{ width:14, height:14, borderWidth:2 }}/> Applying…</>
+                        : <><Zap size={14}/> Apply Template</>}
+                    </button>
+                  </div>
+                </motion.form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* ── Create form ── */}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div className="card exam-create-card"
+            initial={{ opacity:0, y:-10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-10 }}>
+            <h3 className="card-title" style={{ marginBottom:16 }}>New Exam Session</h3>
+            <form onSubmit={handleCreateSession}>
+              <div className="exam-create-grid">
+                <div className="form-group">
+                  <label className="form-label">Session Name *</label>
+                  <input className="form-input" value={createForm.name} autoFocus
+                    onChange={e => setCreateForm(f=>({...f,name:e.target.value}))}
+                    placeholder="e.g. June 2024 Final Exams" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Start Date *</label>
+                  <input type="date" className="form-input" value={createForm.start_date}
+                    onChange={e => setCreateForm(f=>({...f,start_date:e.target.value}))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">End Date *</label>
+                  <input type="date" className="form-input" value={createForm.end_date}
+                    onChange={e => setCreateForm(f=>({...f,end_date:e.target.value}))} />
+                </div>
+              </div>
+              <div className="form-group" style={{ marginBottom:14 }}>
+                <label className="form-label">Description (optional)</label>
+                <input className="form-input" value={createForm.description}
+                  onChange={e => setCreateForm(f=>({...f,description:e.target.value}))}
+                  placeholder="e.g. End of term exams for all classes" />
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button type="submit" className="btn btn-accent">
+                  <Check size={14}/> Create Session
+                </button>
+                <button type="button" className="btn btn-secondary"
+                  onClick={() => setShowCreate(false)}>
+                  <X size={14}/> Cancel
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-@router.get("/exams/sessions/{session_id}")
-def get_session(
-    session_id: str,
-    db: Session = Depends(get_db),
-    _:  User    = Depends(get_current_user),
-):
-    s = _session_or_404(session_id, db)
-    return {**_format_session(s), "slots": [_format_slot(sl) for sl in s.slots]}
+      {/* ── Sessions list ── */}
+      {loading ? <Loader /> : sessions.length === 0 ? (
+        <EmptyState icon={Calendar} title="No exam sessions yet"
+          body="Start from a template or create a blank session"
+          action="Create Session" onAction={() => setShowCreate(true)} />
+      ) : (
+        <div className="exam-session-grid">
+          {sessions.map((s, i) => (
+            <motion.div key={s.id} className="exam-session-card"
+              initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => { loadSession(s.id); setView('session'); loadSupport() }}>
 
+              <div className="exam-session-card-top">
+                <div>
+                  <div className="exam-session-name">{s.name}</div>
+                  <div className="exam-session-dates">
+                    <Calendar size={11}/> {s.start_date} → {s.end_date}
+                  </div>
+                </div>
+                <StatusBadge status={s.status} />
+              </div>
 
-@router.put("/exams/sessions/{session_id}")
-def update_session(
-    session_id: str,
-    data: SessionUpdate,
-    db:   Session = Depends(get_db),
-    _:    User    = Depends(get_current_user),
-):
-    s = _session_or_404(session_id, db)
-    for field, val in data.model_dump(exclude_none=True).items():
-        setattr(s, field, val)
-    db.commit()
-    return _format_session(s)
+              <div className="exam-session-stats">
+                <div className="exam-stat">
+                  <span className="exam-stat-val">{s.slot_count}</span>
+                  <span className="exam-stat-lbl">Slots</span>
+                </div>
+              </div>
 
+              <div className="exam-session-actions" onClick={e => e.stopPropagation()}>
+                <button className="btn btn-sm btn-secondary"
+                  onClick={() => { loadSession(s.id); setView('session'); loadSupport() }}>
+                  <Calendar size={12}/> Open
+                </button>
+                <button className="btn btn-sm btn-secondary"
+                  onClick={() => handlePublish(s.id, s.status)}>
+                  {s.status === 'draft'
+                    ? <><Check size={12}/> Publish</>
+                    : <><ArrowLeft size={12}/> Unpublish</>}
+                </button>
+                <button className="exam-delete-btn" onClick={e => handleDelete(s.id, e)}>
+                  <Trash2 size={13}/>
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 
-@router.delete("/exams/sessions/{session_id}")
-def delete_session(
-    session_id: str,
-    db: Session = Depends(get_db),
-    _:  User    = Depends(get_current_user),
-):
-    s = _session_or_404(session_id, db)
-    if s.status == "published":
-        raise HTTPException(400, "Cannot delete a published session — set to draft first")
-    db.delete(s)
-    db.commit()
-    return {"status": "deleted"}
+  // ────────────────────────────────────────────────────────────────────────────
+  // VIEW: PAPERS CONFIG
+  // ────────────────────────────────────────────────────────────────────────────
+  if (view === 'papers') return (
+    <div className="page-container">
+      <motion.div className="exam-page-header"
+        initial={{ opacity:0, y:-16 }} animate={{ opacity:1, y:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setView('list')}>
+            <ArrowLeft size={14}/>
+          </button>
+          <div>
+            <h1 className="page-title">Exam Papers</h1>
+            <p className="page-subtitle">Configure up to 6 papers per subject</p>
+          </div>
+        </div>
+      </motion.div>
 
+      {papersData.length === 0 ? <Loader /> : (
+        <div className="exam-papers-grid">
+          {papersData.map((subj, i) => (
+            <motion.div key={subj.subject_id} className="exam-paper-card"
+              initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+              transition={{ delay: i * 0.04 }}>
 
-# ── Exam Papers ───────────────────────────────────────────────────────────────
+              <div className="exam-paper-card-head">
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div className="exam-subject-dot"
+                    style={{ background: subj.color_hex || '#6366f1' }} />
+                  <div>
+                    <div className="exam-subject-name">{subj.subject_name}</div>
+                    <div className="exam-subject-grade">Grade {subj.grade_level}</div>
+                  </div>
+                </div>
+                <span className="exam-paper-count">
+                  {subj.papers.length}/6 papers
+                </span>
+              </div>
 
-@router.get("/exams/papers")
-def list_all_papers(
-    db: Session = Depends(get_db),
-    _:  User    = Depends(get_current_user),
-):
-    """Return all papers grouped by subject — used by frontend paper config view."""
-    subjects = db.query(Subject).order_by(Subject.name).all()
-    result = []
-    for subj in subjects:
-        papers = (
-            db.query(ExamPaper)
-            .filter(ExamPaper.subject_id == subj.id)
-            .order_by(ExamPaper.paper_number)
-            .all()
-        )
-        result.append({
-            "subject_id":   subj.id,
-            "subject_name": subj.name,
-            "grade_level":  subj.grade_level,
-            "color_hex":    subj.color_hex,
-            "papers": [
-                {
-                    "id":           p.id,
-                    "paper_number": p.paper_number,
-                    "duration":     p.duration_minutes,
-                    "is_practical": p.is_practical,
+              <div className="exam-paper-list">
+                {subj.papers.length === 0
+                  ? <div className="exam-no-papers">No papers yet — add Paper 1 to start</div>
+                  : subj.papers.map(p => (
+                    <div key={p.id} className="exam-paper-item">
+                      <div className="exam-paper-item-left">
+                        <span className="exam-paper-num">Paper {p.paper_number}</span>
+                        {p.is_practical && (
+                          <span className="exam-practical-tag">
+                            <FlaskConical size={9}/> Practical
+                          </span>
+                        )}
+                      </div>
+                      <div className="exam-paper-item-right">
+                        <Clock size={11}/> {p.duration}min
+                        <button className="exam-paper-del"
+                          onClick={e => handleDeletePaper(p.id, e)}>
+                          <X size={11}/>
+                        </button>
+                      </div>
+                    </div>
+                  ))
                 }
-                for p in papers
-            ],
-        })
-    return result
+              </div>
 
+              {showPaperFor === subj.subject_id ? (
+                <PaperAddForm
+                  existing={subj.papers.map(p => p.paper_number)}
+                  onAdd={data => handleAddPaper(subj.subject_id, data)}
+                  onCancel={() => setShowPaperFor(null)} />
+              ) : subj.papers.length < 6 ? (
+                <button className="exam-add-paper-btn"
+                  onClick={() => setShowPaperFor(subj.subject_id)}>
+                  <Plus size={13}/> Add Paper {subj.papers.length + 1}
+                </button>
+              ) : (
+                <div className="exam-max-papers">Max 6 papers reached</div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 
-@router.get("/exams/subjects/{subject_id}/papers")
-def list_papers(
-    subject_id: str,
-    db: Session = Depends(get_db),
-    _:  User    = Depends(get_current_user),
-):
-    subj = db.query(Subject).filter(Subject.id == subject_id).first()
-    if not subj:
-        raise HTTPException(404, "Subject not found")
-    papers = (
-        db.query(ExamPaper)
-        .filter(ExamPaper.subject_id == subject_id)
-        .order_by(ExamPaper.paper_number)
-        .all()
-    )
-    return [
-        {"id": p.id, "paper_number": p.paper_number,
-         "duration": p.duration_minutes, "is_practical": p.is_practical}
-        for p in papers
-    ]
+  // ────────────────────────────────────────────────────────────────────────────
+  // VIEW: SESSION DETAIL + TIMETABLE GRID
+  // ────────────────────────────────────────────────────────────────────────────
+  if (!active) return <Loader text="Loading session…" />
 
+  const grid = buildGrid(active.slots)
 
-@router.post("/exams/subjects/{subject_id}/papers")
-def add_paper(
-    subject_id: str,
-    data: PaperCreate,
-    db:   Session = Depends(get_db),
-    _:    User    = Depends(get_current_user),
-):
-    subj = db.query(Subject).filter(Subject.id == subject_id).first()
-    if not subj:
-        raise HTTPException(404, "Subject not found")
+  return (
+    <>
+    <div className="page-container">
 
-    clash = db.query(ExamPaper).filter(
-        ExamPaper.subject_id == subject_id,
-        ExamPaper.paper_number == data.paper_number,
-    ).first()
-    if clash:
-        raise HTTPException(409, f"Paper {data.paper_number} already exists for {subj.name}")
+      {/* ── Header ── */}
+      <motion.div className="exam-page-header"
+        initial={{ opacity:0, y:-16 }} animate={{ opacity:1, y:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+          <button className="btn btn-secondary btn-sm"
+            onClick={() => { setView('list'); setActive(null) }}>
+            <ArrowLeft size={14}/>
+          </button>
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <h1 className="page-title" style={{ margin:0 }}>{active.name}</h1>
+              <StatusBadge status={active.status} />
+            </div>
+            <p className="page-subtitle" style={{ margin:0 }}>
+              <Calendar size={12}/> {active.start_date} → {active.end_date}
+              &nbsp;&nbsp;·&nbsp;&nbsp;
+              {(active.slots || []).length} exam slots
+            </p>
+          </div>
+        </div>
 
-    p = ExamPaper(
-        subject_id=subject_id,
-        paper_number=data.paper_number,
-        duration_minutes=data.duration_minutes,
-        is_practical=data.is_practical,
-    )
-    db.add(p)
-    db.commit()
-    db.refresh(p)
-    return {
-        "id": p.id, "subject": subj.name,
-        "paper_number": p.paper_number,
-        "duration": p.duration_minutes,
-        "is_practical": p.is_practical,
-    }
+        <div className="exam-header-actions">
+          <button className="btn btn-secondary btn-sm" onClick={handleValidate}>
+            <CheckCircle2 size={13}/> Validate
+          </button>
+          <button className="btn btn-secondary btn-sm"
+            onClick={() => handlePublish(active.id, active.status)}>
+            {active.status === 'draft'
+              ? <><Check size={13}/> Publish</>
+              : <><ArrowLeft size={13}/> Unpublish</>}
+          </button>
+          <ExportDropdown
+            onPdf={() => handleExport('pdf')}
+            onXlsx={() => handleExport('xlsx')}
+            loading={exporting} />
+          <button className="btn btn-accent btn-sm" onClick={() => setShowGenerate(true)}>
+            <Play size={13}/> Generate
+          </button>
+        </div>
+      </motion.div>
 
+      {/* ── Generate dialog ── */}
+      <AnimatePresence>
+        {showGenerate && (
+          <motion.div className="card exam-gen-card"
+            initial={{ opacity:0, y:-10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+              <h3 className="card-title" style={{ margin:0 }}>Auto-Generate Exam Schedule</h3>
+              <button className="exam-modal-close" onClick={() => setShowGenerate(false)}>
+                <X size={16}/>
+              </button>
+            </div>
+            <form onSubmit={handleGenerate}>
+              <div className="exam-gen-grid">
+                {/* Subjects */}
+                <div>
+                  <label className="form-label" style={{ marginBottom:8 }}>
+                    Subjects&nbsp;
+                    <span className="exam-sel-count">({genForm.subject_ids.length} selected)</span>
+                  </label>
+                  <div className="exam-check-list">
+                    {subjects.map(s => (
+                      <label key={s.id} className="exam-check-item">
+                        <input type="checkbox"
+                          checked={genForm.subject_ids.includes(s.id)}
+                          onChange={() => setGenForm(f=>({
+                            ...f, subject_ids: toggleId(f.subject_ids, s.id)
+                          }))} />
+                        <span>{s.name}</span>
+                        <span className="exam-check-meta">Gr{s.grade_level}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {/* Classes */}
+                <div>
+                  <label className="form-label" style={{ marginBottom:8 }}>
+                    Classes&nbsp;
+                    <span className="exam-sel-count">({genForm.class_ids.length} selected)</span>
+                  </label>
+                  <div className="exam-check-list">
+                    {classes.map(c => (
+                      <label key={c.id} className="exam-check-item">
+                        <input type="checkbox"
+                          checked={genForm.class_ids.includes(c.id)}
+                          onChange={() => setGenForm(f=>({
+                            ...f, class_ids: toggleId(f.class_ids, c.id)
+                          }))} />
+                        <span>{c.name}</span>
+                        <span className="exam-check-meta">Gr{c.grade_level}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-@router.put("/exams/papers/{paper_id}")
-def update_paper(
-    paper_id: str,
-    data: PaperUpdate,
-    db:   Session = Depends(get_db),
-    _:    User    = Depends(get_current_user),
-):
-    paper = db.query(ExamPaper).filter(ExamPaper.id == paper_id).first()
-    if not paper:
-        raise HTTPException(404, "Paper not found")
-    for field, val in data.model_dump(exclude_none=True).items():
-        setattr(paper, field, val)
-    db.commit()
-    return {"status": "updated", "id": paper.id}
+              <div className="exam-gen-options">
+                <div className="form-group">
+                  <label className="form-label">Start Period</label>
+                  <input type="number" className="form-input" min={1} max={8}
+                    value={genForm.start_period}
+                    onChange={e => setGenForm(f=>({...f, start_period:+e.target.value}))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Max Exams / Day</label>
+                  <input type="number" className="form-input" min={1} max={4}
+                    value={genForm.max_per_day}
+                    onChange={e => setGenForm(f=>({...f, max_per_day:+e.target.value}))} />
+                </div>
+                <div>
+                  <label className="form-label" style={{ marginBottom:8, display:'block' }}>Exam Days</label>
+                  <div className="exam-day-toggles">
+                    {DAYS.map(d => (
+                      <button key={d} type="button"
+                        className={`exam-day-btn${genForm.school_days.includes(d) ? ' active' : ''}`}
+                        onClick={() => setGenForm(f => ({
+                          ...f, school_days: toggleId(f.school_days, d)
+                        }))}>
+                        {d.slice(0,3)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
+              <div className="exam-gen-toggles">
+                <label className="exam-gen-toggle-row">
+                  <input type="checkbox"
+                    checked={genForm.include_supervisors}
+                    onChange={e => setGenForm(f=>({...f, include_supervisors: e.target.checked}))}/>
+                  <div>
+                    <div className="exam-gen-toggle-label">Include Supervisors</div>
+                    <div className="exam-gen-toggle-hint">Show supervisor columns in PDF / Excel exports</div>
+                  </div>
+                </label>
+                <label className="exam-gen-toggle-row">
+                  <input type="checkbox"
+                    checked={genForm.include_rooms}
+                    onChange={e => setGenForm(f=>({...f, include_rooms: e.target.checked}))}/>
+                  <div>
+                    <div className="exam-gen-toggle-label">Include Rooms</div>
+                    <div className="exam-gen-toggle-hint">Show room columns in PDF / Excel exports</div>
+                  </div>
+                </label>
+              </div>
+              <div className="wiz-info-banner" style={{ marginTop:12 }}>
+                <Info size={14}/>
+                <span>
+                  Generate only assigns days/periods. Assign supervisors and rooms per
+                  slot afterwards using the <Pencil size={11} style={{display:'inline',verticalAlign:'-1px'}}/> edit icon on each exam card.
+                </span>
+              </div>
 
-@router.delete("/exams/papers/{paper_id}")
-def delete_paper(
-    paper_id: str,
-    db: Session = Depends(get_db),
-    _:  User    = Depends(get_current_user),
-):
-    paper = db.query(ExamPaper).filter(ExamPaper.id == paper_id).first()
-    if not paper:
-        raise HTTPException(404, "Paper not found")
-    db.delete(paper)
-    db.commit()
-    return {"status": "deleted"}
+              <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:16 }}>
+                <button type="button" className="btn btn-secondary"
+                  onClick={() => setShowGenerate(false)}>Cancel</button>
+                <button type="submit" className="btn btn-accent">
+                  <Play size={14}/> Generate Schedule
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* ── Timetable grid ── */}
+      {loading ? <Loader /> : !(active.slots?.length) ? (
+        <EmptyState icon={GraduationCap}
+          title="No exam slots yet"
+          body="Click Generate to auto-schedule, or use a template to get started quickly" />
+      ) : (
+        <motion.div className="exam-grid-wrap"
+          initial={{ opacity:0 }} animate={{ opacity:1 }}>
+          <div className="exam-grid-scroll">
+            <table className="exam-grid-table">
+              <thead>
+                <tr>
+                  <th className="exam-grid-period-head">Period</th>
+                  {DAYS.map(d => (
+                    <th key={d} className="exam-grid-day-head">{d}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(periods.length ? periods : [1,2,3,4]).map(period => (
+                  <tr key={period}>
+                    <td className="exam-grid-period-cell">P{period}</td>
+                    {DAYS.map(day => {
+                      const slots = grid[day]?.[period] || []
+                      return (
+                        <td key={day} className="exam-grid-day-cell">
+                          {slots.length === 0
+                            ? <div className="exam-grid-empty-cell" />
+                            : slots.map(sl => (
+                              <ExamSlotCard key={sl.id} slot={sl}
+                                onLock={lock => handleLock(sl.id, lock)}
+                                onDelete={() => handleDeleteSlot(sl.id)}
+                                onAssign={handleAssignSlot}
+                                supervisors={supervisors}
+                                rooms={rooms}
+                                isEditing={editingSlot === sl.id}
+                                onEditToggle={() =>
+                                  setEditingSlot(prev => prev === sl.id ? null : sl.id)
+                                }
+                              />
+                            ))
+                          }
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-# ── Exam Slots ────────────────────────────────────────────────────────────────
+          {/* Legend */}
+          <div className="exam-legend">
+            <span className="exam-legend-title">Legend:</span>
+            <span className="exam-legend-item"><Lock size={10}/> Locked</span>
+            <span className="exam-legend-item">
+              <FlaskConical size={10}/> Practical
+            </span>
+            <span className="exam-legend-item exam-legend-note">
+              Click <Pencil size={10}/> to assign a supervisor/room, <Lock size={10}/> to lock a slot
+            </span>
+          </div>
+        </motion.div>
+      )}
+    </div>
+    <AIAssistant context="exam" />
+    </>
+  )
+}
 
-@router.post("/exams/sessions/{session_id}/slots")
-def create_slot(
-    session_id: str,
-    data: SlotCreate,
-    db:   Session = Depends(get_db),
-    _:    User    = Depends(get_current_user),
-):
-    _session_or_404(session_id, db)
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-    # Class time conflict
-    time_clash = db.query(ExamSlot).filter(
-        ExamSlot.exam_session_id == session_id,
-        ExamSlot.class_id        == data.class_id,
-        ExamSlot.day             == data.day,
-        ExamSlot.period          == data.period,
-    ).first()
-    if time_clash:
-        raise HTTPException(409, "Conflict: this class already has an exam at that day/period")
+function ExamSlotCard({ slot, onLock, onDelete, onAssign, supervisors=[], rooms=[], isEditing, onEditToggle }) {
+  const hex = slot.subject_color || '#6366f1'
+  const [supId,   setSupId]   = useState(slot.invigilator_id || '')
+  const [roomVal, setRoomVal] = useState(slot.room || '')
+  const [roomId,  setRoomId]  = useState(slot.room_id || '')
 
-    # Same paper, same class twice
-    paper_clash = db.query(ExamSlot).filter(
-        ExamSlot.exam_session_id == session_id,
-        ExamSlot.class_id        == data.class_id,
-        ExamSlot.paper_id        == data.paper_id,
-    ).first()
-    if paper_clash:
-        raise HTTPException(409, "This class already has this paper scheduled")
+  // Keep local edit-form state in sync if the slot data refreshes underneath us
+  // (e.g. after a save elsewhere triggers a reload of the session).
+  useEffect(() => {
+    setSupId(slot.invigilator_id || '')
+    setRoomVal(slot.room || '')
+    setRoomId(slot.room_id || '')
+  }, [slot.invigilator_id, slot.room, slot.room_id])
 
-    slot = ExamSlot(
-        exam_session_id=session_id,
-        paper_id=data.paper_id,
-        class_id=data.class_id,
-        day=data.day,
-        period=data.period,
-        invigilator_id=data.invigilator_id,
-        room=data.room,
-        notes=data.notes,
-    )
-    db.add(slot)
-    db.commit()
-    db.refresh(slot)
-    return _format_slot(slot)
+  return (
+    <motion.div className="exam-slot-card"
+      initial={{ opacity:0, scale:.93 }} animate={{ opacity:1, scale:1 }}
+      style={{ borderLeft:`3px solid ${hex}`, background:`${hex}14` }}>
+      <div className="exam-slot-subject" style={{ color: hex }}>
+        {slot.subject_name}
+        {slot.is_practical && <FlaskConical size={9} style={{ marginLeft:4, opacity:.7 }}/>}
+      </div>
+      <div className="exam-slot-paper">Paper {slot.paper_number}</div>
+      <div className="exam-slot-meta">
+        <span>{slot.class_name}</span>
+        <span>{slot.duration}min</span>
+      </div>
 
+      {/* Supervisor row */}
+      {isEditing ? (
+        <div className="exam-slot-assign-row">
+          <User size={9}/>
+          <select className="exam-slot-assign-select"
+            value={supId} onChange={e => setSupId(e.target.value)}>
+            <option value="">No supervisor</option>
+            {supervisors.map(s => (
+              <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+            ))}
+          </select>
+        </div>
+      ) : slot.invigilator_name ? (
+        <div className="exam-slot-invig">👤 {slot.invigilator_name}</div>
+      ) : (
+        <div className="exam-slot-invig" style={{ color:'var(--muted)', fontStyle:'italic' }}>No supervisor</div>
+      )}
 
-@router.put("/exams/slots/{slot_id}")
-def update_slot(
-    slot_id: str,
-    data:    SlotUpdate,
-    db:      Session = Depends(get_db),
-    _:       User    = Depends(get_current_user),
-):
-    slot = _slot_or_404(slot_id, db)
+      {/* Room row */}
+      {isEditing ? (
+        <div className="exam-slot-assign-row">
+          <MapPin size={9}/>
+          {rooms.length > 0 ? (
+            <select className="exam-slot-assign-select"
+              value={roomId} onChange={e => { setRoomId(e.target.value); setRoomVal('') }}>
+              <option value="">No room</option>
+              {rooms.map(r => (
+                <option key={r.id} value={r.id}>{r.name} (cap:{r.capacity})</option>
+              ))}
+            </select>
+          ) : (
+            <input className="exam-slot-assign-input"
+              value={roomVal} placeholder="Room name…"
+              onChange={e => { setRoomVal(e.target.value); setRoomId('') }}/>
+          )}
+        </div>
+      ) : slot.room ? (
+        <div className="exam-slot-room">📍 {slot.room}</div>
+      ) : null}
 
-    # Locked slot protection — only allow locking/unlocking + non-position changes
-    moving = data.day is not None or data.period is not None
-    if slot.is_locked and moving:
-        raise HTTPException(400, "Cannot move a locked slot — unlock it first")
+      {/* Save assignment */}
+      {isEditing && (
+        <div style={{ display:'flex', gap:4, marginTop:4 }}>
+          <button className="exam-slot-save-btn"
+            onClick={() => onAssign(slot.id, {
+              invigilator_id: supId || null,
+              room_id:        roomId || null,
+              room:           roomVal || null,
+            })}>
+            <Check size={10}/> Save
+          </button>
+          <button className="exam-slot-cancel-btn" onClick={onEditToggle}>
+            <X size={10}/>
+          </button>
+        </div>
+      )}
 
-    # Check time conflict if moving
-    if moving:
-        new_day    = data.day    or slot.day
-        new_period = data.period or slot.period
-        clash = db.query(ExamSlot).filter(
-            ExamSlot.exam_session_id == slot.exam_session_id,
-            ExamSlot.class_id        == slot.class_id,
-            ExamSlot.day             == new_day,
-            ExamSlot.period          == new_period,
-            ExamSlot.id              != slot_id,
-        ).first()
-        if clash:
-            raise HTTPException(409, "Conflict: another exam is already at that day/period")
+      <div className="exam-slot-actions">
+        <button className={`exam-slot-btn${slot.is_locked ? ' locked' : ''}`}
+          onClick={() => onLock(!slot.is_locked)}>
+          {slot.is_locked ? <Lock size={10}/> : <Unlock size={10}/>}
+        </button>
+        {!slot.is_locked && (
+          <button className="exam-slot-btn" onClick={onEditToggle}
+            style={{ color: isEditing ? 'var(--amber)' : 'var(--muted)' }}>
+            <Pencil size={10}/>
+          </button>
+        )}
+        {!slot.is_locked && (
+          <button className="exam-slot-btn delete" onClick={onDelete}>
+            <X size={10}/>
+          </button>
+        )}
+      </div>
+    </motion.div>
+  )
+}
 
-    for field, val in data.model_dump(exclude_none=True).items():
-        setattr(slot, field, val)
-    db.commit()
-    return _format_slot(slot)
+function ExportDropdown({ onPdf, onXlsx, loading }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef()
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
 
+  return (
+    <div className="exam-export-wrap" ref={ref}>
+      <button className="btn btn-secondary btn-sm" onClick={() => setOpen(o => !o)}
+        disabled={!!loading}>
+        {loading
+          ? <><div className="login-spinner" style={{ width:12, height:12, borderWidth:2 }}/> Exporting…</>
+          : <><Download size={13}/> Export <ChevronDown size={11}/></>}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div className="exam-export-dropdown"
+            initial={{ opacity:0, y:-6, scale:.97 }}
+            animate={{ opacity:1, y:0, scale:1 }}
+            exit={{ opacity:0, y:-6, scale:.97 }}>
+            <button className="exam-export-item" onClick={() => { onPdf(); setOpen(false) }}>
+              <FileText size={14} color="#ef4444"/>
+              <div>
+                <div className="exam-export-item-title">Export as PDF</div>
+                <div className="exam-export-item-sub">Printable schedule by day</div>
+              </div>
+            </button>
+            <button className="exam-export-item" onClick={() => { onXlsx(); setOpen(false) }}>
+              <FileSpreadsheet size={14} color="#22c55e"/>
+              <div>
+                <div className="exam-export-item-title">Export as Excel</div>
+                <div className="exam-export-item-sub">Spreadsheet with per-day sheets</div>
+              </div>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
-@router.delete("/exams/slots/{slot_id}")
-def delete_slot(
-    slot_id: str,
-    db:      Session = Depends(get_db),
-    _:       User    = Depends(get_current_user),
-):
-    slot = _slot_or_404(slot_id, db)
-    if slot.is_locked:
-        raise HTTPException(400, "Cannot delete a locked slot — unlock it first")
-    db.delete(slot)
-    db.commit()
-    return {"status": "deleted"}
+function PaperAddForm({ existing, onAdd, onCancel }) {
+  const available = [1,2,3,4,5,6].filter(n => !existing.includes(n))
+  const [num,      setNum]       = useState(available[0] || 1)
+  const [duration, setDuration]  = useState(120)
+  const [practical,setPractical] = useState(false)
 
-
-# ── Auto-generation ───────────────────────────────────────────────────────────
-
-@router.post("/exams/sessions/{session_id}/generate")
-def generate(
-    session_id: str,
-    req:        GenerateRequest,
-    db:         Session = Depends(get_db),
-    _:          User    = Depends(get_current_user),
-):
-    """
-    Balanced exam scheduler.
-
-    Algorithm:
-    1. Collect all (paper, class) pairs that need scheduling.
-    2. Build a day-load tracker per class so no class gets > max_per_day exams/day.
-    3. Round-robin across days, incrementing the day pointer per class.
-    4. Skip slots already occupied; if all days full for a class → raise 409.
-    5. Commit everything at once — either all succeed or nothing is written.
-    """
-    _session_or_404(session_id, db)
-
-    subjects = (
-        db.query(Subject)
-        .filter(Subject.id.in_(req.subject_ids))
-        .all()
-    )
-    classes = (
-        db.query(ClassSection)
-        .filter(ClassSection.id.in_(req.class_ids))
-        .all()
-    )
-
-    if not subjects:
-        raise HTTPException(400, "No matching subjects found")
-    if not classes:
-        raise HTTPException(400, "No matching classes found")
-
-    # Gather papers sorted so Paper 1 always comes before Paper 2, etc.
-    work_items: list[tuple] = []  # (paper, class_section)
-    for subj in subjects:
-        papers = (
-            db.query(ExamPaper)
-            .filter(ExamPaper.subject_id == subj.id)
-            .order_by(ExamPaper.paper_number)
-            .all()
-        )
-        if not papers:
-            continue
-        for cls in classes:
-            for paper in papers:
-                # Skip already-scheduled (paper, class) pairs
-                already = db.query(ExamSlot).filter(
-                    ExamSlot.exam_session_id == session_id,
-                    ExamSlot.paper_id        == paper.id,
-                    ExamSlot.class_id        == cls.id,
-                ).first()
-                if not already:
-                    work_items.append((paper, cls))
-
-    if not work_items:
-        return {"status": "nothing_to_schedule",
-                "message": "All selected papers are already scheduled"}
-
-    # day-load: class_id → {day → count}
-    existing_slots = db.query(ExamSlot).filter(
-        ExamSlot.exam_session_id == session_id
-    ).all()
-    day_load: dict[str, dict[str, int]] = {}
-    for sl in existing_slots:
-        day_load.setdefault(sl.class_id, {})
-        day_load[sl.class_id][sl.day] = day_load[sl.class_id].get(sl.day, 0) + 1
-
-    days = req.school_days
-    # Rotating day pointer per class so each class's exams spread evenly
-    day_ptr: dict[str, int] = {cls.id: 0 for cls in classes}
-
-    new_slots: list[ExamSlot] = []
-
-    for paper, cls in work_items:
-        scheduled = False
-        attempts   = 0
-        ptr        = day_ptr[cls.id]
-
-        while attempts < len(days):
-            day = days[ptr % len(days)]
-
-            # Check max_per_day limit
-            current_load = day_load.get(cls.id, {}).get(day, 0)
-            if current_load < req.max_per_day:
-                new_slots.append(ExamSlot(
-                    exam_session_id=session_id,
-                    paper_id=paper.id,
-                    class_id=cls.id,
-                    day=day,
-                    period=req.start_period,
-                ))
-                # Update day_load immediately so next iteration sees it
-                day_load.setdefault(cls.id, {})[day] = current_load + 1
-                ptr += 1
-                scheduled = True
-                break
-
-            ptr     += 1
-            attempts += 1
-
-        if not scheduled:
-            raise HTTPException(
-                409,
-                f"Cannot schedule {paper.subject.name} Paper {paper.paper_number} "
-                f"for class {cls.name} — all days are full. "
-                f"Increase exam period length or reduce papers per subject."
-            )
-
-        day_ptr[cls.id] = ptr
-
-    for sl in new_slots:
-        db.add(sl)
-    db.commit()
-
-    return {
-        "status":        "generated",
-        "slots_created": len(new_slots),
-        "message":       f"Scheduled {len(new_slots)} exam slots across {len(days)} days",
-    }
-
-
-# ── Validation report ─────────────────────────────────────────────────────────
-
-@router.get("/exams/sessions/{session_id}/validate")
-def validate_session(
-    session_id: str,
-    db: Session = Depends(get_db),
-    _:  User    = Depends(get_current_user),
-):
-    """Return a list of conflicts/warnings for the session."""
-    s = _session_or_404(session_id, db)
-    errors: list[str] = []
-    warnings: list[str] = []
-
-    # Check for invigilator double-booking
-    from collections import defaultdict
-    invig_map: dict = defaultdict(list)
-    for sl in s.slots:
-        if sl.invigilator_id:
-            invig_map[(sl.invigilator_id, sl.day, sl.period)].append(sl)
-
-    for key, clashing in invig_map.items():
-        if len(clashing) > 1:
-            teacher = clashing[0].invigilator.name
-            errors.append(
-                f"Invigilator '{teacher}' assigned to {len(clashing)} exams "
-                f"on {key[1]} period {key[2]}"
-            )
-
-    # Papers without invigilators
-    without_invig = [sl for sl in s.slots if not sl.invigilator_id]
-    if without_invig:
-        warnings.append(f"{len(without_invig)} exam slot(s) have no invigilator assigned")
-
-    # Papers without rooms
-    without_room = [sl for sl in s.slots if not sl.room]
-    if without_room:
-        warnings.append(f"{len(without_room)} exam slot(s) have no room assigned")
-
-    return {
-        "valid":    len(errors) == 0,
-        "errors":   errors,
-        "warnings": warnings,
-        "total_slots": len(s.slots),
-    }
+  return (
+    <motion.form className="exam-paper-form"
+      initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }}
+      onSubmit={e => { e.preventDefault(); onAdd({ paper_number:num, duration_minutes:duration, is_practical:practical }) }}>
+      <div className="exam-paper-form-row">
+        <div>
+          <label style={{ fontSize:11, color:'var(--muted)', display:'block', marginBottom:4 }}>Paper #</label>
+          <select className="form-input" value={num} onChange={e => setNum(+e.target.value)}
+            style={{ padding:'5px 8px', fontSize:13 }}>
+            {available.map(n => <option key={n} value={n}>Paper {n}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize:11, color:'var(--muted)', display:'block', marginBottom:4 }}>Duration (min)</label>
+          <input type="number" className="form-input" value={duration}
+            min={30} max={300} step={15}
+            onChange={e => setDuration(+e.target.value)}
+            style={{ padding:'5px 8px', fontSize:13 }} />
+        </div>
+      </div>
+      <label className="exam-practical-label">
+        <input type="checkbox" checked={practical}
+          onChange={e => setPractical(e.target.checked)} />
+        Practical paper
+      </label>
+      <div style={{ display:'flex', gap:6, marginTop:8 }}>
+        <button type="submit" className="btn btn-accent btn-sm" style={{ flex:1 }}>
+          <Check size={12}/> Add
+        </button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>
+          <X size={12}/>
+        </button>
+      </div>
+    </motion.form>
+  )
+}
