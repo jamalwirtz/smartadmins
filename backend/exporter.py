@@ -19,6 +19,19 @@ try:
 except ImportError:
     RL = False
 
+# FIX: this whole import block was missing entirely. openpyxl, Font,
+# PatternFill, Alignment, Border, Side, get_column_letter and the XLSX flag
+# were all referenced throughout ExcelExporter below but never imported —
+# every call to timetable_xlsx() or exam_xlsx() raised a NameError, meaning
+# ALL Excel exports (timetable and exam) were completely broken.
+try:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    XLSX = True
+except ImportError:
+    XLSX = False
+
 cfg = get_settings()
 
 
@@ -217,7 +230,8 @@ class PDFExporter:
             slot_idx[s.class_id][(s.day, s.period)] = s
 
         styles = getSampleStyleSheet()
-        for cls in db.query(ClassSection).all():
+        all_classes = db.query(ClassSection).all()
+        for i, cls in enumerate(all_classes):
             story.append(Paragraph(
                 f"Class {cls.name}  ·  Grade {cls.grade_level}",
                 ParagraphStyle("CH", parent=styles["Heading2"],
@@ -233,8 +247,9 @@ class PDFExporter:
                     if sl and sl.subject_id:
                         subj = subj_map.get(sl.subject_id)
                         tchr = tchr_map.get(sl.teacher_id) if sl.teacher_id else None
-                        row.append(f"{subj.name if subj else "?"}"
-                                   f"\n{tchr.name.split()[0] if tchr else ""}")
+                        subj_name = subj.name if subj else "?"
+                        tchr_first = tchr.name.split()[0] if tchr else ""
+                        row.append(f"{subj_name}\n{tchr_first}")
                     else:
                         row.append("")
                 rows.append(row)
@@ -244,6 +259,14 @@ class PDFExporter:
             tbl.setStyle(self._tbl_style(theme))
             story.append(tbl)
             story.append(Spacer(1, 0.6*cm))
+
+            # FIX: PageBreak was imported but never used — every class's grid
+            # was just flowing onto the same continuous page(s), forcing the
+            # person to cut/copy pages apart manually. Now each class starts
+            # on its own fresh page (skip the break after the very last class
+            # so we don't leave a trailing blank page).
+            if i < len(all_classes) - 1:
+                story.append(PageBreak())
 
         doc.build(story)
         return buf.getvalue()
@@ -281,7 +304,9 @@ class PDFExporter:
                 if sl:
                     subj = subj_map.get(sl.subject_id)
                     cls  = cls_map.get(sl.class_id)
-                    row.append(f"{subj.name if subj else "?"}\n{cls.name if cls else ""}")
+                    subj_name = subj.name if subj else "?"
+                    cls_name = cls.name if cls else ""
+                    row.append(f"{subj_name}\n{cls_name}")
                 else:
                     row.append("")
             rows.append(row)
@@ -481,10 +506,10 @@ class ExcelExporter:
         for sl in slots:
             by_day[sl.day].append(sl)
 
-        for day in day_order:
+        days_with_slots = [d for d in day_order if by_day.get(d)]
+
+        for di, day in enumerate(days_with_slots):
             day_slots = sorted(by_day.get(day, []), key=lambda s: s.period)
-            if not day_slots:
-                continue
 
             story.append(Paragraph(day, ParagraphStyle("D", parent=styles["Heading2"],
                                                          textColor=colors.HexColor("#1E3A5F"),
@@ -520,6 +545,11 @@ class ExcelExporter:
             story.append(tbl)
             story.append(Spacer(1, 0.4*cm))
 
+            # FIX: give each exam day its own page, same reasoning as the
+            # timetable PDF above — otherwise days run together on one sheet.
+            if di < len(days_with_slots) - 1:
+                story.append(PageBreak())
+
         story.append(Paragraph("* Practical paper", styles["Normal"]))
         doc.build(story)
         return buf.getvalue()
@@ -545,15 +575,34 @@ class ExcelExporter:
 
         day_order = ["Monday","Tuesday","Wednesday","Thursday","Friday"]
 
+        # FIX: inc_sup / inc_room were referenced below but never defined
+        # anywhere — this raised NameError on every single exam Excel export.
+        # Pull the toggle from School Settings (same source the PDF exporter
+        # uses via _exam_cols), defaulting to True/True if unset.
+        try:
+            from models import SchoolSettings
+            _ss = db.query(SchoolSettings).first()
+            inc_sup  = getattr(_ss, "exam_include_supervisors", True) if _ss else True
+            inc_room = getattr(_ss, "exam_include_rooms", True) if _ss else True
+        except Exception:
+            inc_sup, inc_room = True, True
+
         # ── Overview sheet ────────────────────────────────────────────────────
         ws_ov = wb.create_sheet("Overview")
         ws_ov["A1"] = cfg.SCHOOL_NAME
         ws_ov["A1"].font = Font(bold=True, size=16, color=_EXAM_H)
         ws_ov["A2"] = f"Exam Session: {session.name}   |   {session.start_date} → {session.end_date}"
         ws_ov["A2"].font = Font(italic=True, size=11, color="555555")
-        ws_ov.merge_cells("A1:H1"); ws_ov.merge_cells("A2:H2")
 
-        ov_headers = ["Day","Period","Subject","Paper","Class","Duration (min)","Invigilator","Room"]
+        # FIX: headers now match the row data exactly — previously the header
+        # row always listed "Invigilator"/"Room" columns even when inc_sup/
+        # inc_room were False, so data columns didn't line up under headers.
+        ov_headers = ["Day","Period","Subject","Paper","Class","Duration (min)"]
+        if inc_sup:  ov_headers.append("Invigilator")
+        if inc_room: ov_headers.append("Room")
+        last_col = get_column_letter(len(ov_headers))
+        ws_ov.merge_cells(f"A1:{last_col}1"); ws_ov.merge_cells(f"A2:{last_col}2")
+
         for ci, h in enumerate(ov_headers, 1):
             c = ws_ov.cell(row=4, column=ci, value=h)
             c.font      = Font(bold=True, color=_WHITE)
@@ -578,7 +627,7 @@ class ExcelExporter:
                 if ri % 2 == 0:
                     c.fill = PatternFill("solid", fgColor=_GREY_L)
 
-        widths = [13,9,18,12,10,16,22,16]
+        widths = [13,9,18,12,10,16,22,16][:len(ov_headers)]
         for ci, w in enumerate(widths, 1):
             ws_ov.column_dimensions[get_column_letter(ci)].width = w
 
