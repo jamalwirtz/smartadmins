@@ -75,7 +75,7 @@ export default function Exams() {
   const [papersData, setPapersData] = useState([])
   const [supervisors, setSupervisors] = useState([])
   const [rooms,       setRooms]       = useState([])
-  const [editingSlot, setEditingSlot] = useState(null)  // slot being assigned
+  const [editingSlot, setEditingSlot] = useState(null)  // id of the slot currently in edit mode
   const [examTpls,   setExamTpls]   = useState([])
   const [ttTpls,     setTtTpls]     = useState([])
 
@@ -251,10 +251,14 @@ export default function Exams() {
     } catch (err) { toast.error(err?.response?.data?.detail || 'Cannot delete locked slot') }
   }
 
+  // FIX: this function already existed but was never passed to <ExamSlotCard>,
+  // so the whole "assign supervisor/room" feature was dead — clicking the
+  // pencil icon did nothing because onEditToggle was undefined.
   const handleAssignSlot = async (slotId, updates) => {
     try {
       await examsAPI.updateSlot(slotId, updates)
       setEditingSlot(null)
+      toast.success('Assignment saved ✅')
       loadSession(active.id)
     } catch (err) { toast.error(err?.response?.data?.detail || 'Update failed') }
   }
@@ -777,7 +781,7 @@ export default function Exams() {
                     onChange={e => setGenForm(f=>({...f, include_supervisors: e.target.checked}))}/>
                   <div>
                     <div className="exam-gen-toggle-label">Include Supervisors</div>
-                    <div className="exam-gen-toggle-hint">Show supervisor columns in PDF / Excel</div>
+                    <div className="exam-gen-toggle-hint">Show supervisor columns in PDF / Excel exports</div>
                   </div>
                 </label>
                 <label className="exam-gen-toggle-row">
@@ -786,9 +790,16 @@ export default function Exams() {
                     onChange={e => setGenForm(f=>({...f, include_rooms: e.target.checked}))}/>
                   <div>
                     <div className="exam-gen-toggle-label">Include Rooms</div>
-                    <div className="exam-gen-toggle-hint">Show room columns in PDF / Excel</div>
+                    <div className="exam-gen-toggle-hint">Show room columns in PDF / Excel exports</div>
                   </div>
                 </label>
+              </div>
+              <div className="wiz-info-banner" style={{ marginTop:12 }}>
+                <Info size={14}/>
+                <span>
+                  Generate only assigns days/periods. Assign supervisors and rooms per
+                  slot afterwards using the <Pencil size={11} style={{display:'inline',verticalAlign:'-1px'}}/> edit icon on each exam card.
+                </span>
               </div>
 
               <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:16 }}>
@@ -834,7 +845,15 @@ export default function Exams() {
                             : slots.map(sl => (
                               <ExamSlotCard key={sl.id} slot={sl}
                                 onLock={lock => handleLock(sl.id, lock)}
-                                onDelete={() => handleDeleteSlot(sl.id)} />
+                                onDelete={() => handleDeleteSlot(sl.id)}
+                                onAssign={handleAssignSlot}
+                                supervisors={supervisors}
+                                rooms={rooms}
+                                isEditing={editingSlot === sl.id}
+                                onEditToggle={() =>
+                                  setEditingSlot(prev => prev === sl.id ? null : sl.id)
+                                }
+                              />
                             ))
                           }
                         </td>
@@ -854,7 +873,7 @@ export default function Exams() {
               <FlaskConical size={10}/> Practical
             </span>
             <span className="exam-legend-item exam-legend-note">
-              Click <Lock size={10}/> to lock a slot
+              Click <Pencil size={10}/> to assign a supervisor/room, <Lock size={10}/> to lock a slot
             </span>
           </div>
         </motion.div>
@@ -869,9 +888,17 @@ export default function Exams() {
 
 function ExamSlotCard({ slot, onLock, onDelete, onAssign, supervisors=[], rooms=[], isEditing, onEditToggle }) {
   const hex = slot.subject_color || '#6366f1'
-  const [supId,  setSupId]  = useState(slot.invigilator_id || '')
+  const [supId,   setSupId]   = useState(slot.invigilator_id || '')
   const [roomVal, setRoomVal] = useState(slot.room || '')
   const [roomId,  setRoomId]  = useState(slot.room_id || '')
+
+  // Keep local edit-form state in sync if the slot data refreshes underneath us
+  // (e.g. after a save elsewhere triggers a reload of the session).
+  useEffect(() => {
+    setSupId(slot.invigilator_id || '')
+    setRoomVal(slot.room || '')
+    setRoomId(slot.room_id || '')
+  }, [slot.invigilator_id, slot.room, slot.room_id])
 
   return (
     <motion.div className="exam-slot-card"
