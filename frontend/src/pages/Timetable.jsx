@@ -65,6 +65,17 @@ function TimetableCell({ slot, onLock, onEditSlot }) {
       transition={{ duration:0.2 }}
       {...(slot.is_locked ? {} : { ...attributes, ...listeners })}>
 
+      {/* FIX: this badge didn't exist before — locked state was only shown
+          via a barely-visible 9px emoji in the corner (opacity .8) that
+          required close inspection to notice. Now it's a persistent, always
+          visible pill so a locked slot reads as "locked" at a glance,
+          instantly, without hovering. */}
+      {slot.is_locked && (
+        <div className="tt-lock-badge" title="Locked — this slot won't move during reshuffle">
+          <Lock size={9}/> Locked
+        </div>
+      )}
+
       {isSpecial ? (
         <div className="tt-cell-special-inner">
           <span className="tt-cell-type-icon">{stype.icon}</span>
@@ -87,12 +98,12 @@ function TimetableCell({ slot, onLock, onEditSlot }) {
         <button className="tt-lock-btn"
           onClick={e => { e.stopPropagation(); onLock(slot) }}
           title={slot.is_locked ? 'Unlock slot' : 'Lock slot'}>
-          {slot.is_locked ? <Lock size={9} color="var(--amber)"/> : <Unlock size={9} color="var(--muted)"/>}
+          {slot.is_locked ? <Lock size={10} color="var(--amber)"/> : <Unlock size={10} color="var(--muted)"/>}
         </button>
         <button className="tt-edit-slot-btn"
           onClick={e => { e.stopPropagation(); onEditSlot && onEditSlot(slot) }}
           title="Change slot type">
-          <Pencil size={9}/>
+          <Pencil size={10}/>
         </button>
       </div>
     </motion.div>
@@ -235,7 +246,7 @@ function TimetableGrid({ slots, classes, onLock, onMove, activeDraftId }) {
       </DndContext>
 
       <p className="text-muted text-xs mt-4">
-        Drag cells to move or swap. Click 🔒 to lock a slot. Locked slots survive reshuffles.
+        Drag cells to move or swap. Click the lock icon to lock a slot — locked slots show a badge and survive reshuffles.
       </p>
     </div>
   )
@@ -372,10 +383,26 @@ export default function Timetable() {
     loadDrafts()
   }
 
+  // FIX: this used to only call the API and wait for the WebSocket
+  // broadcast to come back before the padlock badge appeared — on any
+  // network delay (or if the WS connection dropped), the lock state didn't
+  // visibly change when clicked. Now the UI updates immediately (optimistic
+  // update), and only reverts if the server actually rejects the change.
   const toggleLock = async (slot) => {
+    const nextLocked = !slot.is_locked
+    setDraftDetail(prev => prev ? {
+      ...prev,
+      slots: prev.slots.map(s => s.id === slot.id ? { ...s, is_locked: nextLocked } : s),
+    } : prev)
     try {
-      await schedulesAPI.lockSlot(slot.id, !slot.is_locked)
-    } catch { toast.error('Lock failed') }
+      await schedulesAPI.lockSlot(slot.id, nextLocked)
+    } catch {
+      setDraftDetail(prev => prev ? {
+        ...prev,
+        slots: prev.slots.map(s => s.id === slot.id ? { ...s, is_locked: !nextLocked } : s),
+      } : prev)
+      toast.error('Lock failed')
+    }
   }
 
   const validate = async () => {
