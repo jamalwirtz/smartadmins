@@ -171,7 +171,7 @@ function Topbar({ user, onLogout, onMenuClick, photoUrl }) {
 function Sidebar({ user, onLogout, onClose, photoUrl }) {
   const navigate = useNavigate()
   const closeOnMobile = () => {
-    if (window.innerWidth <= 768) onClose?.()
+    if (window.innerWidth <= 900) onClose?.()
   }
 
   return (
@@ -187,6 +187,13 @@ function Sidebar({ user, onLogout, onClose, photoUrl }) {
             <div className="sidebar-subtitle">Timetable Generator</div>
           </div>
         </div>
+        {/* FIX: previously there was no visible way to close the sidebar on
+            mobile other than tapping the dimmed overlay behind it — easy to
+            miss, especially on very narrow screens where the sidebar covers
+            most of the viewport. This close button is always reachable. */}
+        <button className="sidebar-mobile-close" onClick={onClose} aria-label="Close menu">
+          <XIcon size={16}/>
+        </button>
       </div>
 
       <nav className="sidebar-nav">
