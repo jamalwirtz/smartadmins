@@ -1,68 +1,92 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   SSTG — Enterprise Design System
-   Font: Syne (display) + JetBrains Mono (code)
-   Aesthetic: Deep navy + electric amber + glass morphism
-───────────────────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Nunito:wght@300;400;500;600;700&display=swap');
+/* тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+   SSTG тАФ Design System
+   Font: Inter
+   Aesthetic: Muddo-style тАФ neutral light/dark surfaces, light-blue primary accent,
+   red for danger/warnings, green for success. See themes.txt for the spec.
+
+   IMPORTANT: these tokens are redefined app-wide, but `.sidebar` and `.home-page`
+   both re-pin the same variable names back to their original values in their own
+   scoped rules further down this file тАФ by request, neither the navigation
+   sidebar nor the public home page should change color. Everything else
+   (Dashboard, Teachers, Subjects, Classes, Timetable, Exams, Settings, etc.)
+   picks up the new palette automatically since they all read from these
+   same custom properties.
+тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Palette */
+  /* Palette тАФ kept the original variable names (--navy-*, --amber, --teal, etc.)
+     so every existing component rule below picks up the new values without
+     needing to be individually rewritten. --amber now holds the new primary
+     light-blue accent (#38BDF8) rather than orange; --green/--red map onto
+     the spec's success/danger colors almost exactly as they already were. */
   --navy-950:  #070d1a;
   --navy-900:  #0d1b35;
   --navy-800:  #122240;
   --navy-700:  #1a3258;
   --navy-600:  #243d6e;
-  --blue-500:  #2952a3;
-  --blue-400:  #3b6cd4;
-  --blue-300:  #6b9eef;
-  --amber:     #f59e0b;
-  --amber-light:#fbbf24;
-  --teal:      #0d9488;
-  --teal-light:#14b8a6;
-  --red:       #ef4444;
+  --blue-500:  #0ea5e9;
+  --blue-400:  #38bdf8;
+  --blue-300:  #7dd3fc;
+  --amber:     #38bdf8;   /* primary accent тАФ was orange, now Muddo light blue */
+  --amber-light:#7dd3fc;
+  --teal:      #38bdf8;
+  --teal-light:#7dd3fc;
+  --red:       #ef4444;   /* danger тАФ matches spec exactly */
   --red-dark:  #dc2626;
-  --green:     #22c55e;
+  --green:     #4ade80;   /* success тАФ matches spec exactly */
   --green-dark:#16a34a;
   --violet:    #7c3aed;
 
-  /* Surface */
-  --bg:        #f1f5fb;
+  /* Surface тАФ light theme, per spec */
+  --bg:        #f8fafc;
   --surface:   #ffffff;
-  --surface-2: #f8faff;
+  --surface-2: #f1f5f9;
   --glass:     rgba(255,255,255,0.72);
   --glass-dark:rgba(13,27,53,0.75);
-  --border:    #dde4f0;
-  --border-2:  #c5d0e8;
+  --border:    #e5e7eb;
+  --border-2:  #d1d5db;
 
-  /* Text */
-  --text:      #1E293B;   /* charcoal — softer than pure black */
-  --text-2:    #3a4f72;
-  --muted:     #64748b;
-  --muted-2:   #94a3b8;
+  /* Text тАФ per spec */
+  --text:      #111827;
+  --text-2:    #4b5563;
+  --muted:     #6b7280;
+  --muted-2:   #9ca3af;
 
-  /* Radii */
+  /* Radii тАФ buttons 10-12px, cards 16px per spec (already matched by --r / --r-lg) */
   --r-sm:  6px;
   --r:     10px;
   --r-lg:  16px;
   --r-xl:  22px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(15,31,61,0.08);
-  --shadow:    0 4px 16px rgba(15,31,61,0.10);
-  --shadow-md: 0 8px 30px rgba(15,31,61,0.13);
-  --shadow-lg: 0 20px 60px rgba(15,31,61,0.18);
-  --shadow-glow: 0 0 0 3px rgba(41,82,163,0.18);
+  --shadow-sm: 0 1px 3px rgba(15,23,42,0.06);
+  --shadow:    0 4px 16px rgba(15,23,42,0.08);
+  --shadow-md: 0 8px 30px rgba(15,23,42,0.12);
+  --shadow-lg: 0 20px 60px rgba(15,23,42,0.16);
+  --shadow-glow: 0 0 0 3px rgba(56,189,248,0.22);
 
-  /* Typography */
-  --font-display: 'Syne', system-ui, sans-serif;
-  --font-body:    'Nunito', system-ui, sans-serif;
+  /* Typography тАФ Inter throughout, per spec (headings 700, body 400) */
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-numeric: 'Inter', system-ui, sans-serif;
   --font-mono:    'JetBrains Mono', monospace;
 
   /* Transitions */
   --ease:  cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Respect reduced-motion preference app-wide, per spec's accessibility section */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 html, body, #root {
@@ -75,19 +99,39 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Scrollbars ────────────────────────────────────────────────────────────── */
+/* тФАтФА Scrollbars тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--blue-400); }
 
-/* ── Shell ─────────────────────────────────────────────────────────────────── */
+/* тФАтФА Shell тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .app-shell { display: flex; height: 100vh; overflow: hidden; }
 
-/* ── Sidebar ───────────────────────────────────────────────────────────────── */
+/* тФАтФА Sidebar тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .sidebar {
+  /* FIX: pins the sidebar's colors and font back to the original navy/amber
+     scheme regardless of the palette change above тАФ per request, the nav
+     bar should not change color theme. Every var() used anywhere inside
+     .sidebar's DOM subtree resolves to these local values instead. */
+  --navy-950:  #070d1a;
+  --navy-900:  #0d1b35;
+  --navy-800:  #122240;
+  --navy-700:  #1a3258;
+  --navy-600:  #243d6e;
+  --blue-500:  #2952a3;
+  --blue-400:  #3b6cd4;
+  --blue-300:  #6b9eef;
+  --amber:     #f59e0b;
+  --amber-light:#fbbf24;
+  --teal:      #0d9488;
+  --teal-light:#14b8a6;
+  --font-display: 'Syne', system-ui, sans-serif;
+  --font-body:    'Nunito', system-ui, sans-serif;
+
   width: 240px;
   min-width: 240px;
+
   background: var(--navy-900);
   display: flex;
   flex-direction: column;
@@ -217,10 +261,10 @@ html, body, #root {
 }
 .sidebar-logout:hover { background: rgba(239,68,68,0.12); color: #fca5a5; border-color: rgba(239,68,68,0.2); }
 
-/* ── Main content ──────────────────────────────────────────────────────────── */
+/* тФАтФА Main content тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .main-content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-width: 0; }
 
-/* ── Topbar ────────────────────────────────────────────────────────────────── */
+/* тФАтФА Topbar тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .topbar {
   background: var(--glass);
   backdrop-filter: blur(12px);
@@ -237,7 +281,7 @@ html, body, #root {
 .topbar-title { font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--text); }
 .topbar-actions { display: flex; gap: 8px; align-items: center; }
 
-/* ── Live indicator ────────────────────────────────────────────────────────── */
+/* тФАтФА Live indicator тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .live-dot {
   display: inline-flex;
   align-items: center;
@@ -272,19 +316,23 @@ html, body, #root {
   font-weight: 600;
 }
 
-/* ── Page ──────────────────────────────────────────────────────────────────── */
+/* тФАтФА Page тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .page { padding: 24px 28px; flex: 1; }
 
-/* ── Cards ─────────────────────────────────────────────────────────────────── */
+/* тФАтФА Cards тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
   padding: 22px;
-  transition: box-shadow 0.2s var(--ease);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
 }
-.card:hover { box-shadow: var(--shadow); }
+.card:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-2);
+}
 .card-header {
   display: flex;
   align-items: center;
@@ -306,7 +354,7 @@ html, body, #root {
   box-shadow: var(--shadow-md);
 }
 
-/* ── Buttons ───────────────────────────────────────────────────────────────── */
+/* тФАтФА Buttons тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .btn {
   font-family: var(--font-body); /* Figtree */
   display: inline-flex;
@@ -337,15 +385,15 @@ html, body, #root {
 .btn-primary {
   background: linear-gradient(135deg, var(--blue-500), var(--blue-400));
   color: #fff;
-  box-shadow: 0 2px 8px rgba(41,82,163,0.3);
+  box-shadow: 0 2px 8px rgba(14,165,233,0.3);
 }
-.btn-primary:hover { box-shadow: 0 4px 16px rgba(41,82,163,0.4); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(14,165,233,0.4); }
 .btn-accent {
   background: linear-gradient(135deg, var(--amber), var(--amber-light));
   color: var(--navy-900);
-  box-shadow: 0 2px 8px rgba(245,158,11,0.3);
+  box-shadow: 0 2px 8px rgba(56,189,248,0.3);
 }
-.btn-accent:hover { box-shadow: 0 4px 16px rgba(245,158,11,0.4); }
+.btn-accent:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(56,189,248,0.4); }
 .btn-ghost {
   background: transparent;
   color: var(--text-2);
@@ -365,7 +413,7 @@ html, body, #root {
   flex-shrink: 0;
 }
 
-/* ── Forms ─────────────────────────────────────────────────────────────────── */
+/* тФАтФА Forms тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .form-group { margin-bottom: 16px; }
 .form-label { display: block; font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 6px; letter-spacing: 0.2px; }
 .form-input, .form-select, .form-textarea {
@@ -386,7 +434,7 @@ html, body, #root {
 }
 .form-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
-/* ── Table ─────────────────────────────────────────────────────────────────── */
+/* тФАтФА Table тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .table-wrap { overflow-x: auto; border-radius: var(--r); }
 table { width: 100%; border-collapse: collapse; }
 thead th {
@@ -405,7 +453,7 @@ tbody tr { transition: background 0.1s; }
 tbody tr:hover { background: #f7f9ff; }
 tbody tr:last-child td { border-bottom: none; }
 
-/* ── Badges ────────────────────────────────────────────────────────────────── */
+/* тФАтФА Badges тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -424,7 +472,7 @@ tbody tr:last-child td { border-bottom: none; }
 .badge-violet  { background: #ede9fe; color: #6d28d9; }
 .badge-teal    { background: #ccfbf1; color: #0f766e; }
 
-/* ── Timetable Grid ────────────────────────────────────────────────────────── */
+/* тФАтФА Timetable Grid тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .tt-wrap { overflow-x: auto; }
 .tt-table { border-collapse: separate; border-spacing: 3px; min-width: 700px; width: 100%; }
 .tt-table thead th {
@@ -473,15 +521,6 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .tt-cell:active { cursor: grabbing; }
 .tt-cell:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 2; }
-.tt-cell.locked { border-color: var(--amber) !important; }
-.tt-cell.locked::after {
-  content: '🔒';
-  position: absolute;
-  top: 4px;
-  right: 5px;
-  font-size: 9px;
-  opacity: 0.8;
-}
 .tt-cell.empty {
   background: var(--surface-2) !important;
   border: 1.5px dashed var(--border) !important;
@@ -497,7 +536,103 @@ tbody tr:last-child td { border-bottom: none; }
 .tt-cell-teacher { font-size: 10.5px; color: var(--text-2); margin-top: 1px; }
 .tt-cell-class   { font-size: 9.5px; color: var(--muted); font-family: var(--font-mono); }
 
-/* ── Draft Cards ───────────────────────────────────────────────────────────── */
+/* FIX: these classes are used in Timetable.jsx's TimetableCell component but
+   were never given any CSS at all тАФ the lock/edit buttons were rendering as
+   raw, unstyled default browser <button> elements crammed into each grid
+   cell, and the lock state had no visible indicator beyond a 9px, 80%-opacity
+   emoji. This block gives the editor a clean, human-designed action layer
+   and makes locked slots unmistakable at a glance without hovering. */
+
+/* Persistent, always-visible badge on locked cells тАФ no hover required */
+.tt-lock-badge {
+  position: absolute;
+  top: 6px; left: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--amber);
+  color: #06202e;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(56,189,248,.45);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Locked cell treatment тАФ accent border + tinted background, immediately
+   distinguishable from an unlocked cell without needing the badge text */
+.tt-cell.locked {
+  border: 1.5px solid var(--amber) !important;
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
+/* Hover-revealed action row (lock toggle + edit type) */
+.tt-cell-btns {
+  position: absolute;
+  top: 4px; right: 4px;
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity .15s var(--ease), transform .15s var(--ease);
+  z-index: 4;
+}
+.tt-cell:hover .tt-cell-btns,
+.tt-cell:focus-within .tt-cell-btns {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* Push the action row down slightly on locked cells so it doesn't collide
+   with the always-visible lock badge in the top-left */
+.tt-cell.locked .tt-cell-btns { top: 24px; }
+
+.tt-lock-btn, .tt-edit-slot-btn {
+  width: 21px; height: 21px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(15,23,42,.12);
+  transition: background .12s var(--ease), transform .12s var(--ease), border-color .12s var(--ease);
+}
+.tt-lock-btn:hover, .tt-edit-slot-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-2);
+  transform: scale(1.1);
+}
+.tt-lock-btn:active, .tt-edit-slot-btn:active { transform: scale(0.94); }
+
+.tt-cell-note-dot {
+  position: absolute;
+  bottom: 5px; left: 6px;
+  font-size: 10px;
+  opacity: .75;
+}
+
+/* Special event cells (break / lunch / assembly / devotion / event / free) */
+.tt-cell-special-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+  width: 100%;
+  text-align: center;
+}
+.tt-cell-type-icon { font-size: 16px; line-height: 1; }
+.tt-cell-type-label { font-size: 10px; font-weight: 700; letter-spacing: .2px; }
+.tt-cell.tt-cell-special { padding-top: 10px; }
+
+
+/* тФАтФА Draft Cards тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .draft-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
 .draft-card {
   background: var(--surface);
@@ -527,7 +662,7 @@ tbody tr:last-child td { border-bottom: none; }
 .draft-card-meta { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
 .draft-card-actions { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
 
-/* ── Modal ─────────────────────────────────────────────────────────────────── */
+/* тФАтФА Modal тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -560,7 +695,7 @@ tbody tr:last-child td { border-bottom: none; }
 .modal-subtitle { font-size: 12.5px; color: var(--muted); margin-bottom: 22px; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
 
-/* ── Stats ─────────────────────────────────────────────────────────────────── */
+/* тФАтФА Stats тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
 .stat-card {
   background: var(--surface);
@@ -582,7 +717,7 @@ tbody tr:last-child td { border-bottom: none; }
 .stat-label { font-size: 11.5px; color: var(--muted); margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
 .stat-icon { position: absolute; top: 16px; right: 16px; opacity: 0.12; }
 
-/* ── Progress bar ──────────────────────────────────────────────────────────── */
+/* тФАтФА Progress bar тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .progress-bar {
   height: 8px;
   background: var(--border);
@@ -598,7 +733,7 @@ tbody tr:last-child td { border-bottom: none; }
 .progress-fill.warn  { background: linear-gradient(90deg, var(--amber), var(--amber-light)); }
 .progress-fill.danger{ background: linear-gradient(90deg, var(--red-dark), var(--red)); }
 
-/* ── Workload bar ──────────────────────────────────────────────────────────── */
+/* тФАтФА Workload bar тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .workload-bar { height: 10px; background: var(--border); border-radius: 10px; overflow: hidden; margin-top: 8px; }
 .workload-fill {
   height: 100%;
@@ -606,7 +741,7 @@ tbody tr:last-child td { border-bottom: none; }
   transition: width 0.7s var(--ease-spring);
 }
 
-/* ── Login page ────────────────────────────────────────────────────────────── */
+/* тФАтФА Login page тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -634,8 +769,8 @@ tbody tr:last-child td { border-bottom: none; }
   background-size: 40px 40px;
   pointer-events: none;
 }
-/* old login-card and logo styles removed — see two-panel block below */
-/* ── Empty state ───────────────────────────────────────────────────────────── */
+/* old login-card and logo styles removed тАФ see two-panel block below */
+/* тФАтФА Empty state тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .empty-state {
   text-align: center;
   padding: 60px 20px;
@@ -645,14 +780,14 @@ tbody tr:last-child td { border-bottom: none; }
 .empty-state-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text-2); margin-bottom: 6px; }
 .empty-state-sub { font-size: 13px; }
 
-/* ── Day-off picker ────────────────────────────────────────────────────────── */
+/* тФАтФА Day-off picker тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .day-btn { padding: 6px 12px; border-radius: var(--r-sm); font-size: 12px; font-weight: 700;
            border: 1.5px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer;
            transition: all 0.15s; }
 .day-btn:hover { border-color: var(--blue-300); color: var(--blue-400); }
 .day-btn.off { background: #fee2e2; border-color: var(--red-dark); color: var(--red-dark); }
 
-/* ── Color swatch ──────────────────────────────────────────────────────────── */
+/* тФАтФА Color swatch тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .color-swatch {
   width: 26px; height: 26px; border-radius: 50%;
   cursor: pointer; transition: transform 0.15s var(--ease-spring);
@@ -661,10 +796,10 @@ tbody tr:last-child td { border-bottom: none; }
 .color-swatch:hover { transform: scale(1.15); }
 .color-swatch.selected { border-color: var(--navy-900); transform: scale(1.15); box-shadow: 0 0 0 2px rgba(0,0,0,0.2); }
 
-/* ── Notification toast override ──────────────────────────────────────────── */
+/* тФАтФА Notification toast override тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .toast-custom { font-family: var(--font-body) !important; font-size: 13px !important; border-radius: var(--r) !important; }
 
-/* ── Misc helpers ──────────────────────────────────────────────────────────── */
+/* тФАтФА Misc helpers тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .flex-row { display: flex; align-items: center; gap: 8px; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; }
@@ -684,7 +819,7 @@ tbody tr:last-child td { border-bottom: none; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip { padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
 
-/* ── Spinner ───────────────────────────────────────────────────────────────── */
+/* тФАтФА Spinner тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .spinner-wrap { display: flex; align-items: center; justify-content: center; padding: 60px; }
 .spinner {
   width: 36px; height: 36px;
@@ -695,7 +830,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Drag overlay ──────────────────────────────────────────────────────────── */
+/* тФАтФА Drag overlay тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .drag-overlay {
   opacity: 0.9;
   transform: rotate(3deg) scale(1.05);
@@ -705,13 +840,13 @@ tbody tr:last-child td { border-bottom: none; }
   z-index: 9999;
 }
 
-/* ── Spin animation for loading icons ─────────────────────────────────────── */
+/* тФАтФА Spin animation for loading icons тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .spinning { animation: spin 0.7s linear infinite; }
 
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   LOGIN PAGE — Two-panel layout with hero image
-───────────────────────────────────────────────────────────────────────────── */
+/* тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+   LOGIN PAGE тАФ Two-panel layout with hero image
+тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 
 .login-layout {
   display: flex;
@@ -726,7 +861,7 @@ tbody tr:last-child td { border-bottom: none; }
   margin: 20px;
 }
 
-/* ── Left hero panel ────────────────────────────────────────────────────── */
+/* тФАтФА Left hero panel тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .login-hero-panel {
   flex: 1.2;
   position: relative;
@@ -802,7 +937,7 @@ tbody tr:last-child td { border-bottom: none; }
   color: rgba(255,255,255,0.65);
 }
 
-/* ── Right auth card ────────────────────────────────────────────────────── */
+/* тФАтФА Right auth card тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .login-card {
   width: 400px;
   min-width: 360px;
@@ -938,14 +1073,14 @@ tbody tr:last-child td { border-bottom: none; }
   animation: spin 0.65s linear infinite;
 }
 
-/* Responsive — stack on narrow screens */
+/* Responsive тАФ stack on narrow screens */
 @media (max-width: 720px) {
   .login-hero-panel { display: none; }
   .login-card { width: 100%; min-width: unset; border-left: none; border-radius: 24px; }
   .login-layout { max-width: 420px; border-radius: 24px; }
 }
 
-/* ── Sidebar logo image ────────────────────────────────────────────────── */
+/* тФАтФА Sidebar logo image тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .sidebar-logo-img {
   width: 34px;
   height: 34px;
@@ -956,9 +1091,9 @@ tbody tr:last-child td { border-bottom: none; }
   flex-shrink: 0;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
    SOCIAL AUTH BUTTONS
-───────────────────────────────────────────────────────────────────────────── */
+тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .social-buttons {
   display: flex;
   flex-direction: column;
@@ -988,7 +1123,7 @@ tbody tr:last-child td { border-bottom: none; }
   animation: spin 0.65s linear infinite;
 }
 
-/* ── OR divider ──────────────────────────────────────────────────────────── */
+/* тФАтФА OR divider тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .auth-or-divider {
   display: flex;
   align-items: center;
@@ -1007,7 +1142,7 @@ tbody tr:last-child td { border-bottom: none; }
   font-weight: 500;
 }
 
-/* ── Input prefix icons ──────────────────────────────────────────────────── */
+/* тФАтФА Input prefix icons тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .input-prefix-icon {
   position: absolute;
   left: 12px;
@@ -1035,7 +1170,7 @@ tbody tr:last-child td { border-bottom: none; }
   transform: translateY(-50%);
 }
 
-/* ── Forgot password / auth switch ──────────────────────────────────────── */
+/* тФАтФА Forgot password / auth switch тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .auth-forgot {
   font-size: 11.5px;
   color: rgba(255,255,255,0.35);
@@ -1057,14 +1192,14 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .auth-switch-link:hover { opacity: 0.8; text-decoration: underline; }
 
-/* ── Field label required note ──────────────────────────────────────────── */
+/* тФАтФА Field label required note тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .field-required {
   font-size: 10.5px;
   color: rgba(255,255,255,0.3);
   font-weight: 400;
 }
 
-/* ── Password strength ───────────────────────────────────────────────────── */
+/* тФАтФА Password strength тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .strength-wrap {
   display: flex;
   align-items: center;
@@ -1109,7 +1244,7 @@ tbody tr:last-child td { border-bottom: none; }
 .pw-rule.optional { font-style: italic; }
 .pw-rule.optional.passed { color: #86efac; }
 
-/* ── Email verification ──────────────────────────────────────────────────── */
+/* тФАтФА Email verification тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .auth-back-btn {
   display: flex;
   align-items: center;
@@ -1181,7 +1316,7 @@ tbody tr:last-child td { border-bottom: none; }
   line-height: 1.5;
 }
 
-/* ── Sidebar help button ─────────────────────────────────────────────────── */
+/* тФАтФА Sidebar help button тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .sidebar-help-btn {
   display: flex;
   align-items: center;
@@ -1205,9 +1340,9 @@ tbody tr:last-child td { border-bottom: none; }
   color: var(--amber);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
    WALKTHROUGH MODAL
-───────────────────────────────────────────────────────────────────────────── */
+тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .wt-overlay {
   position: fixed;
   inset: 0;
@@ -1441,29 +1576,30 @@ tbody tr:last-child td { border-bottom: none; }
   .code-digit { width: 38px; height: 46px; font-size: 19px; }
 }
 
-/* ═════════════════════════════════════════════════════════════════════════════
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
    DARK MODE VARIABLES
    Applied via [data-theme="dark"] on <html>
-═════════════════════════════════════════════════════════════════════════════ */
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 [data-theme="dark"] {
-  --bg:        #070d1a;
-  --surface:   #0d1b35;
-  --surface-2: #122240;
-  --glass:     rgba(13,27,53,0.88);
-  --glass-dark:rgba(7,13,26,0.92);
-  --border:    rgba(255,255,255,0.07);
-  --border-2:  rgba(255,255,255,0.12);
-  --text:      #e8edf5;
-  --text-2:    #a0b0cc;
-  --muted:     #6b80a0;
-  --muted-2:   #4a5f80;
+  /* Dark theme values per spec */
+  --bg:        #0f172a;
+  --surface:   #1e293b;
+  --surface-2: #1f2937;
+  --glass:     rgba(30,41,59,0.88);
+  --glass-dark:rgba(15,23,42,0.92);
+  --border:    #374151;
+  --border-2:  #4b5563;
+  --text:      #f9fafb;
+  --text-2:    #d1d5db;
+  --muted:     #9ca3af;
+  --muted-2:   #6b7280;
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
   --shadow:    0 4px 16px rgba(0,0,0,0.5);
   --shadow-md: 0 8px 30px rgba(0,0,0,0.55);
   --shadow-lg: 0 20px 60px rgba(0,0,0,0.65);
 }
 
-/* ── App shell update — main area ──────────────────────────────────────── */
+/* тФАтФА App shell update тАФ main area тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .app-main {
   flex: 1;
   display: flex;
@@ -1477,9 +1613,9 @@ tbody tr:last-child td { border-bottom: none; }
   overflow-x: hidden;
 }
 
-/* ═════════════════════════════════════════════════════════════════════════════
-   TOPBAR — improved with user dropdown
-═════════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   TOPBAR тАФ improved with user dropdown
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 .topbar {
   height: 56px;
   min-height: 56px;
@@ -1661,9 +1797,9 @@ tbody tr:last-child td { border-bottom: none; }
 .sidebar-user-clickable { cursor: pointer; border-radius: var(--r); transition: background 0.15s; }
 .sidebar-user-clickable:hover { background: rgba(255,255,255,0.06); }
 
-/* ═════════════════════════════════════════════════════════════════════════════
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
    SETTINGS PAGE
-═════════════════════════════════════════════════════════════════════════════ */
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 .settings-layout {
   display: flex;
   flex-direction: column;
@@ -1886,15 +2022,81 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .settings-link-btn:hover { color: var(--amber); }
 
-/* ═════════════════════════════════════════════════════════════════════════════
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
    HOME / LANDING PAGE
-═════════════════════════════════════════════════════════════════════════════ */
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 .home-page {
+  /* FIX: pins the home page's entire color system and font back to their
+     original values regardless of the app-wide palette/font change above тАФ
+     per request, only animation/transition polish should be added here,
+     no color changes. Animations are handled separately below and inline
+     in Home.jsx via framer-motion; this rule only protects color/font. */
+  --navy-950:  #070d1a;
+  --navy-900:  #0d1b35;
+  --navy-800:  #122240;
+  --navy-700:  #1a3258;
+  --navy-600:  #243d6e;
+  --blue-500:  #2952a3;
+  --blue-400:  #3b6cd4;
+  --blue-300:  #6b9eef;
+  --amber:     #f59e0b;
+  --amber-light:#fbbf24;
+  --teal:      #0d9488;
+  --teal-light:#14b8a6;
+  --red:       #ef4444;
+  --red-dark:  #dc2626;
+  --green:     #22c55e;
+  --green-dark:#16a34a;
+  --violet:    #7c3aed;
+  --font-display: 'Syne', system-ui, sans-serif;
+  --font-body:    'Nunito', system-ui, sans-serif;
+
   min-height: 100vh;
   background: var(--navy-950);
   color: #fff;
   font-family: var(--font-body);
 }
+
+/* Home page animation & interaction polish only (no color changes) */
+.home-nav-link {
+  position: relative;
+}
+.home-nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 100%; bottom: -4px;
+  height: 2px;
+  background: var(--amber);
+  border-radius: 2px;
+  transition: right 0.25s var(--ease);
+}
+.home-nav-link:hover::after { right: 0; }
+
+.home-feature-card, .home-testimonial-card, .home-curriculum-pill, .home-step {
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+.home-feature-card:hover {
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 16px 40px rgba(0,0,0,.35);
+}
+.home-testimonial-card:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(0,0,0,.3); }
+.home-curriculum-pill:hover { transform: translateY(-2px) scale(1.03); }
+
+.hero-btn-primary, .hero-btn-ghost, .home-btn-primary, .home-btn-ghost,
+.home-cta-primary, .home-cta-secondary, .home-nav-btn-solid, .home-nav-btn-ghost {
+  transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), background 0.18s var(--ease);
+}
+.hero-btn-primary:active, .home-cta-primary:active, .home-nav-btn-solid:active {
+  transform: scale(0.97);
+}
+
+/* Section reveal on scroll is already handled via whileInView in Home.jsx;
+   this just softens the default browser scroll and focus behavior to match. */
+.home-page :focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
 
 /* Nav */
 .home-nav {
@@ -2242,7 +2444,7 @@ tbody tr:last-child td { border-bottom: none; }
 .home-footer-link { font-size: 12.5px; color: rgba(255,255,255,0.35); text-decoration: none; font-weight: 600; transition: color 0.15s; }
 .home-footer-link:hover { color: var(--amber); }
 
-/* ── Light mode homepage (auto when [data-theme="light"]) ── */
+/* тФАтФА Light mode homepage (auto when [data-theme="light"]) тФАтФА */
 [data-theme="light"] .home-page,
 [data-theme="light"] .home-nav,
 [data-theme="light"] .home-hero,
@@ -2268,7 +2470,7 @@ tbody tr:last-child td { border-bottom: none; }
   .topbar-user-info { display: none; }
 }
 
-/* ── Login "Try Demo" button ──────────────────────────────────────────────── */
+/* тФАтФА Login "Try Demo" button тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .login-demo-btn {
   display: flex;
   align-items: center;
@@ -2295,7 +2497,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .login-demo-btn:disabled { opacity: 0.7; cursor: wait; }
 
-/* ── Login demo credentials bar — now a button ────────────────────────────── */
+/* тФАтФА Login demo credentials bar тАФ now a button тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .login-demo {
   display: flex;
   align-items: center;
@@ -2318,7 +2520,7 @@ tbody tr:last-child td { border-bottom: none; }
   font-style: italic;
 }
 
-/* ── Home demo note ───────────────────────────────────────────────────────── */
+/* тФАтФА Home demo note тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 .home-demo-note {
   margin-top: 20px;
   font-size: 13px;
@@ -2334,7 +2536,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .home-demo-link:hover { color: var(--amber-light); }
 
-/* ── Dark mode: ensure stat card values are readable ─────────────────────── */
+/* тФАтФА Dark mode: ensure stat card values are readable тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 [data-theme="dark"] .stat-card { background: var(--surface); }
 [data-theme="dark"] .card { background: var(--surface); border-color: var(--border); }
 [data-theme="dark"] .draft-card { background: var(--surface); border-color: var(--border); }
@@ -2346,11 +2548,11 @@ tbody tr:last-child td { border-bottom: none; }
 [data-theme="dark"] .settings-input { background: var(--bg); }
 [data-theme="dark"] .topbar { background: var(--surface); border-bottom-color: var(--border); }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   EXAM TIMETABLE — full design system
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   EXAM TIMETABLE тАФ full design system
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
-/* ── Page layout ── */
+/* тФАтФА Page layout тФАтФА */
 .exam-page-header {
   display: flex;
   align-items: flex-start;
@@ -2366,7 +2568,7 @@ tbody tr:last-child td { border-bottom: none; }
   flex-wrap: wrap;
 }
 
-/* ── Status badge ── */
+/* тФАтФА Status badge тФАтФА */
 .exam-badge {
   display: inline-flex;
   align-items: center;
@@ -2379,7 +2581,7 @@ tbody tr:last-child td { border-bottom: none; }
   white-space: nowrap;
 }
 
-/* ── Loader ── */
+/* тФАтФА Loader тФАтФА */
 .exam-loader {
   display: flex;
   flex-direction: column;
@@ -2396,7 +2598,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .exam-loader-text { font-size: 13px; color: var(--muted); }
 
-/* ── Empty state ── */
+/* тФАтФА Empty state тФАтФА */
 .exam-empty {
   display: flex;
   flex-direction: column;
@@ -2416,7 +2618,7 @@ tbody tr:last-child td { border-bottom: none; }
 .exam-empty-title { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
 .exam-empty-body  { font-size: 14px; color: var(--muted); margin: 0 0 8px; }
 
-/* ── Session cards (list view) ── */
+/* тФАтФА Session cards (list view) тФАтФА */
 .exam-session-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -2487,7 +2689,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .exam-delete-btn:hover { background: rgba(239,68,68,.18); }
 
-/* ── Create form ── */
+/* тФАтФА Create form тФАтФА */
 .exam-create-card { margin-bottom: 20px; }
 .exam-create-grid {
   display: grid;
@@ -2496,7 +2698,7 @@ tbody tr:last-child td { border-bottom: none; }
   margin-bottom: 14px;
 }
 
-/* ── Template modal ── */
+/* тФАтФА Template modal тФАтФА */
 .exam-modal-backdrop {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.6);
@@ -2538,7 +2740,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .exam-modal-close:hover { background: var(--border); color: var(--text); }
 
-/* ── Template cards ── */
+/* тФАтФА Template cards тФАтФА */
 .exam-tpl-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -2582,7 +2784,7 @@ tbody tr:last-child td { border-bottom: none; }
   color: #000;
 }
 
-/* ── Template apply form ── */
+/* тФАтФА Template apply form тФАтФА */
 .exam-tpl-apply-form {
   border-top: 1px solid var(--border);
   padding-top: 20px;
@@ -2594,7 +2796,7 @@ tbody tr:last-child td { border-bottom: none; }
   margin-bottom: 16px;
 }
 
-/* ── Checklist (subjects / classes selector) ── */
+/* тФАтФА Checklist (subjects / classes selector) тФАтФА */
 .exam-check-list {
   display: flex; flex-direction: column; gap: 4px;
   max-height: 180px; overflow-y: auto;
@@ -2612,7 +2814,7 @@ tbody tr:last-child td { border-bottom: none; }
 .exam-check-item:hover { background: var(--border); }
 .exam-check-meta { margin-left: auto; font-size: 11px; color: var(--muted); }
 
-/* ── Papers view ── */
+/* тФАтФА Papers view тФАтФА */
 .exam-papers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -2677,7 +2879,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .exam-max-papers { font-size: 11px; color: var(--muted); text-align: center; padding: 8px; }
 
-/* ── Paper add form ── */
+/* тФАтФА Paper add form тФАтФА */
 .exam-paper-form {
   margin-top: 8px; overflow: hidden;
   padding: 12px; background: var(--surface-2);
@@ -2689,7 +2891,7 @@ tbody tr:last-child td { border-bottom: none; }
   font-size: 12px; color: var(--muted); cursor: pointer;
 }
 
-/* ── Generate dialog ── */
+/* тФАтФА Generate dialog тФАтФА */
 .exam-gen-card { margin-bottom: 20px; }
 .exam-gen-grid {
   display: grid;
@@ -2716,7 +2918,7 @@ tbody tr:last-child td { border-bottom: none; }
   color: var(--amber);
 }
 
-/* ── Timetable grid ── */
+/* тФАтФА Timetable grid тФАтФА */
 .exam-grid-wrap { margin-top: 16px; }
 .exam-grid-scroll { overflow-x: auto; }
 .exam-grid-table {
@@ -2751,7 +2953,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .exam-grid-empty-cell { height: 64px; }
 
-/* ── Slot card ── */
+/* тФАтФА Slot card тФАтФА */
 .exam-slot-card {
   border-radius: 8px; padding: 8px 10px;
   margin-bottom: 4px; cursor: default;
@@ -2785,7 +2987,7 @@ tbody tr:last-child td { border-bottom: none; }
 .exam-slot-btn.delete { color: var(--red, #ef4444); margin-left: auto; }
 .exam-slot-btn.delete:hover { background: rgba(239,68,68,.12); }
 
-/* ── Export dropdown ── */
+/* тФАтФА Export dropdown тФАтФА */
 .exam-export-wrap { position: relative; }
 .exam-export-dropdown {
   position: absolute; top: calc(100% + 6px); right: 0;
@@ -2808,7 +3010,7 @@ tbody tr:last-child td { border-bottom: none; }
 .exam-export-item-title { font-size: 13px; font-weight: 600; color: var(--text); }
 .exam-export-item-sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
 
-/* ── Legend ── */
+/* тФАтФА Legend тФАтФА */
 .exam-legend {
   display: flex; align-items: center; gap: 16px;
   margin-top: 12px; padding: 8px 14px;
@@ -2819,7 +3021,7 @@ tbody tr:last-child td { border-bottom: none; }
 .exam-legend-item   { display: flex; align-items: center; gap: 5px; color: var(--muted); }
 .exam-legend-note   { margin-left: auto; font-style: italic; }
 
-/* ── Responsive ── */
+/* тФАтФА Responsive тФАтФА */
 @media (max-width: 768px) {
   .exam-session-grid { grid-template-columns: 1fr; }
   .exam-create-grid  { grid-template-columns: 1fr; }
@@ -2833,11 +3035,11 @@ tbody tr:last-child td { border-bottom: none; }
   .exam-tpl-apply-row { grid-template-columns: 1fr; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   AI ASSISTANT — floating chat panel
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   AI ASSISTANT тАФ floating chat panel
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
-/* ── FAB trigger ── */
+/* тФАтФА FAB trigger тФАтФА */
 .ai-fab {
   position: fixed;
   bottom: 28px; right: 28px;
@@ -2855,7 +3057,7 @@ tbody tr:last-child td { border-bottom: none; }
 .ai-fab:hover { box-shadow: 0 6px 28px rgba(124,58,237,.55); }
 .ai-fab-label { font-size: 9px; font-weight: 800; letter-spacing: .5px; }
 
-/* ── Panel ── */
+/* тФАтФА Panel тФАтФА */
 .ai-panel {
   position: fixed;
   bottom: 90px; right: 24px;
@@ -2868,7 +3070,7 @@ tbody tr:last-child td { border-bottom: none; }
   z-index: 101; overflow: hidden;
 }
 
-/* ── Header ── */
+/* тФАтФА Header тФАтФА */
 .ai-header {
   display: flex; align-items: center;
   justify-content: space-between;
@@ -2891,7 +3093,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .ai-close:hover { background: var(--border); color: var(--text); }
 
-/* ── Messages ── */
+/* тФАтФА Messages тФАтФА */
 .ai-messages {
   flex: 1; overflow-y: auto;
   padding: 12px 14px; display: flex;
@@ -2919,7 +3121,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .ai-msg-text a { color: var(--amber); }
 
-/* ── Suggestions ── */
+/* тФАтФА Suggestions тФАтФА */
 .ai-suggestions {
   margin-top: 8px; padding: 8px 10px;
   background: rgba(124,58,237,.08);
@@ -2934,7 +3136,7 @@ tbody tr:last-child td { border-bottom: none; }
 .ai-suggestion-item:last-child { border-bottom: none; }
 .ai-suggestions-more { font-size: 10px; color: var(--muted); margin-top: 4px; font-style: italic; }
 
-/* ── Typing indicator ── */
+/* тФАтФА Typing indicator тФАтФА */
 .ai-typing { display: flex; align-items: center; gap: 5px; padding: 4px 0; }
 .ai-typing-dot {
   width: 7px; height: 7px; border-radius: 50%;
@@ -2948,7 +3150,7 @@ tbody tr:last-child td { border-bottom: none; }
   50%       { transform: translateY(-4px); opacity: 1; }
 }
 
-/* ── Quick prompts ── */
+/* тФАтФА Quick prompts тФАтФА */
 .ai-quick {
   display: flex; flex-direction: column; gap: 5px;
   padding: 8px 14px;
@@ -2965,7 +3167,7 @@ tbody tr:last-child td { border-bottom: none; }
   border-color: var(--border-2);
 }
 
-/* ── Input row ── */
+/* тФАтФА Input row тФАтФА */
 .ai-input-row {
   display: flex; align-items: center; gap: 8px;
   padding: 12px 14px;
@@ -2993,15 +3195,15 @@ tbody tr:last-child td { border-bottom: none; }
 .spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Mobile ── */
+/* тФАтФА Mobile тФАтФА */
 @media (max-width: 480px) {
   .ai-panel { width: calc(100vw - 24px); right: 12px; bottom: 80px; }
   .ai-fab   { bottom: 20px; right: 20px; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SETTINGS — new additions (badge upload, PDF themes, orientation)
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   SETTINGS тАФ new additions (badge upload, PDF themes, orientation)
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .settings-badge-upload {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
@@ -3055,9 +3257,9 @@ tbody tr:last-child td { border-bottom: none; }
   background: rgba(245,158,11,.07);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   TEACHER ASSIGNMENT — panel layout
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   TEACHER ASSIGNMENT тАФ panel layout
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .teacher-layout {
   display: grid;
@@ -3204,9 +3406,9 @@ tbody tr:last-child td { border-bottom: none; }
   border-color: transparent; color: #fff;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   DASHBOARD — impressive redesign
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   DASHBOARD тАФ impressive redesign
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .dash-hero {
   background: linear-gradient(135deg,
@@ -3356,7 +3558,7 @@ tbody tr:last-child td { border-bottom: none; }
   .dash-stats { grid-template-columns: 1fr; }
 }
 
-/* ── Humanistic number improvements ─────────────────────────────────────────── */
+/* тФАтФА Humanistic number improvements тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА */
 
 /* All numeric stat displays */
 .stat-value, .dash-stat-value, .exam-stat-val,
@@ -3374,13 +3576,13 @@ tbody tr:last-child td { border-bottom: none; }
   font-variant-numeric: tabular-nums;
 }
 
-/* Badges with numbers — use proportional for short labels */
+/* Badges with numbers тАФ use proportional for short labels */
 .badge, .exam-badge {
   font-family: var(--font-display);
   font-variant-numeric: proportional-nums lining-nums;
 }
 
-/* Input numbers — feel natural when typing */
+/* Input numbers тАФ feel natural when typing */
 input[type="number"] {
   font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
@@ -3400,9 +3602,9 @@ input[type="number"] {
   letter-spacing: .02em;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
    SKELETON SCREENS
-   ═══════════════════════════════════════════════════════════════════════════ */
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .skeleton-block {
   background: linear-gradient(
@@ -3420,9 +3622,9 @@ input[type="number"] {
   100% { background-position: -200% center; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
    MOBILE IMPROVEMENTS
-   ═══════════════════════════════════════════════════════════════════════════ */
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 /* Mobile sidebar toggle button */
 /* Mobile menu button in topbar */
@@ -3432,39 +3634,96 @@ input[type="number"] {
   color: var(--text); padding: 6px;
   border-radius: 8px; transition: background .12s;
   align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 .topbar-menu-btn:hover { background: var(--surface-2); }
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .topbar-menu-btn { display: flex; }
 }
 
-@media (max-width: 768px) {
-  /* Sidebar slides in/out on mobile */
+/* Close button inside the sidebar itself тАФ only shown on mobile/tablet so
+   the person always has an obvious, always-visible way to dismiss the menu
+   rather than relying only on tapping the dimmed overlay behind it. */
+.sidebar-mobile-close {
+  display: none;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6);
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+.sidebar-mobile-close:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+/* FIX: this whole block replaces the previous 768px-only version. The
+   trigger breakpoint is widened to 900px (768px-wide tablets were landing
+   right on the old boundary and looking cramped/overlapping), the sidebar
+   width is capped relative to the viewport instead of a fixed 240px (which
+   could consume nearly the entire screen on narrow phones), and the overlay
+   is strengthened so the dimming is clearly visible behind the open menu. */
+@media (max-width: 900px) {
+  .app-shell { overflow-x: hidden; }
+
   .sidebar {
     position: fixed; left: 0; top: 0; bottom: 0; z-index: 160;
+    width: min(240px, 78vw);
+    min-width: unset;
     transform: translateX(-100%);
     transition: transform .28s cubic-bezier(.4,0,.2,1);
-    box-shadow: 4px 0 24px rgba(0,0,0,.25);
+    box-shadow: 4px 0 28px rgba(0,0,0,.35);
   }
   .app-shell.sidebar-open .sidebar {
     transform: translateX(0);
   }
+  .sidebar-brand-inner { flex: 1; min-width: 0; }
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .sidebar-mobile-close { display: flex; }
+
   .app-main {
     margin-left: 0 !important;
     width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
   }
+  .topbar { padding-left: 12px; padding-right: 12px; }
+  .page, .page-container { padding-left: 16px; padding-right: 16px; }
+
   /* Overlay only visible on mobile when sidebar is open */
   .sidebar-overlay {
     position: fixed; inset: 0;
-    background: rgba(0,0,0,.5);
-    backdrop-filter: blur(2px);
+    background: rgba(7,13,26,.6);
+    backdrop-filter: blur(3px);
     z-index: 155;
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   PRINT STYLES — timetable and exam schedule
-   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 420px) {
+  .sidebar { width: min(220px, 84vw); }
+  .topbar { padding-left: 10px; padding-right: 10px; }
+  .page, .page-container { padding-left: 12px; padding-right: 12px; }
+  .topbar-title, .topbar-page-label { font-size: 15px; }
+}
+
+/* Prevent any single page from forcing horizontal scroll on narrow devices */
+@media (max-width: 900px) {
+  .dash-stats, .exam-session-grid, .exam-papers-grid, .class-grid,
+  .home-features-grid, .home-testimonials-grid {
+    grid-template-columns: 1fr !important;
+  }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   PRINT STYLES тАФ timetable and exam schedule
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 @media print {
   /* Hide non-printable UI */
@@ -3481,7 +3740,7 @@ input[type="number"] {
     margin: 0; padding: 0;
   }
 
-  /* Timetable grid — make it clean for printing */
+  /* Timetable grid тАФ make it clean for printing */
   .exam-grid-table,
   .tt-grid {
     width: 100% !important;
@@ -3508,9 +3767,9 @@ input[type="number"] {
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   GLOBAL POLISH — micro-improvements
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   GLOBAL POLISH тАФ micro-improvements
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 /* Smooth focus rings */
 :focus-visible {
@@ -3550,13 +3809,13 @@ input::placeholder, textarea::placeholder {
 *, *::before, *::after {
   transition: background-color .15s ease, border-color .15s ease, color .08s ease;
 }
-/* But NOT for animations — they handle their own timing */
+/* But NOT for animations тАФ they handle their own timing */
 [class*="motion-"], .ai-typing-dot, .exam-loader-ring,
 .login-spinner { transition: none; }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   MULTI-STEP WIZARD — class creation flow
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   MULTI-STEP WIZARD тАФ class creation flow
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .wizard-backdrop {
   position: fixed; inset: 0;
@@ -3601,7 +3860,7 @@ input::placeholder, textarea::placeholder {
 }
 .wizard-close:hover { background: var(--border); color: var(--text); }
 
-/* ── Step indicator bar ── */
+/* тФАтФА Step indicator bar тФАтФА */
 .wizard-steps {
   display: flex; align-items: center;
   padding: 16px 24px;
@@ -3647,7 +3906,7 @@ input::placeholder, textarea::placeholder {
 }
 .wizard-step-line.done { background: #10b981; }
 
-/* ── Wizard body + footer ── */
+/* тФАтФА Wizard body + footer тФАтФА */
 .wizard-body { padding: 20px 24px; flex: 1; }
 
 .wizard-step-content { display: flex; flex-direction: column; gap: 0; }
@@ -3658,7 +3917,7 @@ input::placeholder, textarea::placeholder {
   border-top: 1px solid var(--border);
 }
 
-/* ── Wizard form fields ── */
+/* тФАтФА Wizard form fields тФАтФА */
 .wizard-form-grid {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 14px; margin-bottom: 8px;
@@ -3697,7 +3956,7 @@ input::placeholder, textarea::placeholder {
 }
 .wiz-select:focus { border-color: rgba(41,82,163,.5); }
 
-/* ── Subject selection grid ── */
+/* тФАтФА Subject selection grid тФАтФА */
 .wiz-subject-grid {
   display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr));
   gap: 8px; margin-bottom: 14px;
@@ -3758,7 +4017,7 @@ input::placeholder, textarea::placeholder {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
 }
 
-/* ── Teacher assignment rows ── */
+/* тФАтФА Teacher assignment rows тФАтФА */
 .wiz-info-banner {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 12px 14px; margin-bottom: 16px;
@@ -3814,16 +4073,16 @@ input::placeholder, textarea::placeholder {
   background: rgba(245,158,11,.12); color: #f59e0b;
 }
 
-/* ── Result stat boxes ── */
+/* тФАтФА Result stat boxes тФАтФА */
 .wiz-result-stat {
   display: flex; flex-direction: column; align-items: center;
   padding: 16px 28px; border-radius: var(--r-xl); gap: 4px;
   min-width: 110px;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   CLASS CARDS — list view
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   CLASS CARDS тАФ list view
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .class-grid {
   display: grid;
@@ -3892,17 +4151,17 @@ input::placeholder, textarea::placeholder {
   padding-top: 12px; border-top: 1px solid var(--border);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   RESPONSIVE — all pages, all breakpoints
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   RESPONSIVE тАФ all pages, all breakpoints
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
-/* ── 1200px — large tablets/small laptops ── */
+/* тФАтФА 1200px тАФ large tablets/small laptops тФАтФА */
 @media (max-width: 1200px) {
   .dash-grid { grid-template-columns: 1fr; }
   .dash-stats { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* ── 1024px ── */
+/* тФАтФА 1024px тФАтФА */
 @media (max-width: 1024px) {
   .teacher-layout { grid-template-columns: 1fr; }
   .teacher-form-panel { position: static; }
@@ -3911,7 +4170,7 @@ input::placeholder, textarea::placeholder {
   .exam-gen-options { grid-template-columns: 1fr 1fr; }
 }
 
-/* ── 900px — tablets ── */
+/* тФАтФА 900px тАФ tablets тФАтФА */
 @media (max-width: 900px) {
   .dash-stats { grid-template-columns: repeat(2, 1fr); }
   .wizard-form-grid { grid-template-columns: 1fr; }
@@ -3926,7 +4185,7 @@ input::placeholder, textarea::placeholder {
   .exam-header-actions { width: 100%; flex-wrap: wrap; }
 }
 
-/* ── 768px — mobile landscape / small tablets ── */
+/* тФАтФА 768px тАФ mobile landscape / small tablets тФАтФА */
 @media (max-width: 768px) {
   /* sidebar handled by sidebar-open class */
   .app-main { margin-left: 0 !important; width: 100%; }
@@ -3980,7 +4239,7 @@ input::placeholder, textarea::placeholder {
   .topbar { padding: 0 14px 0 56px; }
 }
 
-/* ── 480px — small phones ── */
+/* тФАтФА 480px тАФ small phones тФАтФА */
 @media (max-width: 480px) {
   .dash-stats { grid-template-columns: 1fr; }
   .dash-stat-card { padding: 14px 12px; }
@@ -4004,7 +4263,7 @@ input::placeholder, textarea::placeholder {
   .dash-card { padding: 16px 14px; }
 }
 
-/* ── Landscape phone ── */
+/* тФАтФА Landscape phone тФАтФА */
 @media (max-height: 500px) and (orientation: landscape) {
   .wizard-modal { max-height: 100vh; border-radius: 0; }
   .wizard-backdrop { padding: 0; }
@@ -4013,7 +4272,7 @@ input::placeholder, textarea::placeholder {
   .wizard-body { padding: 12px 16px; }
 }
 
-/* ── Touch devices — better tap targets ── */
+/* тФАтФА Touch devices тАФ better tap targets тФАтФА */
 @media (hover: none) and (pointer: coarse) {
   .btn, .nav-link, .teacher-card, .class-card,
   .exam-session-card, .dash-action-btn, .wiz-subject-card {
@@ -4025,9 +4284,9 @@ input::placeholder, textarea::placeholder {
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
    SCHEDULE SETTINGS PAGE
-   ═══════════════════════════════════════════════════════════════════════════ */
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .sched-layout {
   display: grid;
@@ -4126,7 +4385,7 @@ input::placeholder, textarea::placeholder {
   border-color: var(--border-2); color: var(--text);
 }
 
-/* ── Schedule preview ── */
+/* тФАтФА Schedule preview тФАтФА */
 .sched-preview-list {
   display: flex; flex-direction: column; gap: 4px;
   max-height: 460px; overflow-y: auto;
@@ -4160,9 +4419,9 @@ input::placeholder, textarea::placeholder {
 .sched-preview-type-dot.break  { background: #f59e0b; }
 .sched-preview-type-dot.lunch  { background: #10b981; }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
    TIMETABLE PDF PANEL (slide-in from right)
-   ═══════════════════════════════════════════════════════════════════════════ */
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .tt-pdf-panel {
   position: fixed;
@@ -4247,9 +4506,9 @@ input::placeholder, textarea::placeholder {
   color: var(--amber);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   EXAM SLOT CARD — supervisor + room inline assign
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   EXAM SLOT CARD тАФ supervisor + room inline assign
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .exam-slot-assign-row {
   display: flex; align-items: center; gap: 5px;
@@ -4293,9 +4552,9 @@ input::placeholder, textarea::placeholder {
 }
 .exam-slot-cancel-btn:hover { background: var(--border); }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   RESPONSIVE — Schedule Settings + PDF Panel
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   RESPONSIVE тАФ Schedule Settings + PDF Panel
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 @media (max-width: 900px) {
   .sched-layout {
@@ -4320,9 +4579,9 @@ input::placeholder, textarea::placeholder {
   .sched-day-btn { padding: 6px 10px; font-size: 11px; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   EXAM GENERATE — supervisor/room toggles
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   EXAM GENERATE тАФ supervisor/room toggles
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .exam-gen-toggles {
   display: flex;
@@ -4363,11 +4622,11 @@ input::placeholder, textarea::placeholder {
   color: var(--muted);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   TEACHER VIEW — single + comparison
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   TEACHER VIEW тАФ single + comparison
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
-/* ── View toggle ── */
+/* тФАтФА View toggle тФАтФА */
 .tv-view-toggle {
   display: flex;
   background: var(--surface-2);
@@ -4402,7 +4661,7 @@ input::placeholder, textarea::placeholder {
   min-width: 200px;
 }
 
-/* ── Teacher selector chips ── */
+/* тФАтФА Teacher selector chips тФАтФА */
 .tv-teacher-selector { padding: 20px; margin-bottom: 16px; }
 .tv-teacher-chips {
   display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
@@ -4427,7 +4686,7 @@ input::placeholder, textarea::placeholder {
 .tv-chip-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
 .tv-chip-info { min-width: 0; flex: 1; }
 
-/* ── Single view ── */
+/* тФАтФА Single view тФАтФА */
 .tv-single-header {
   display: flex; justify-content: space-between;
   align-items: flex-start; margin-bottom: 14px;
@@ -4463,7 +4722,7 @@ input::placeholder, textarea::placeholder {
 }
 .tv-workload-fill { height: 100%; border-radius: 3px; transition: width .5s; }
 
-/* ── Grid ── */
+/* тФАтФА Grid тФАтФА */
 .tv-grid-scroll { overflow-x: auto; }
 .tv-table {
   width: 100%; border-collapse: collapse; min-width: 600px;
@@ -4508,7 +4767,7 @@ input::placeholder, textarea::placeholder {
 }
 .tv-cell-lock { font-size: 9px; display: block; margin-top: 2px; }
 
-/* ── Compare view ── */
+/* тФАтФА Compare view тФАтФА */
 .tv-compare-wrap { display: flex; flex-direction: column; gap: 20px; }
 
 .tv-conflict-banner {
@@ -4556,7 +4815,7 @@ input::placeholder, textarea::placeholder {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ── Workload comparison bars ── */
+/* тФАтФА Workload comparison bars тФАтФА */
 .tv-workload-compare {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -4580,7 +4839,7 @@ input::placeholder, textarea::placeholder {
 }
 .tv-workload-pct { font-size: 11px; font-weight: 700; text-align: right; }
 
-/* ── Responsive ── */
+/* тФАтФА Responsive тФАтФА */
 @media (max-width: 900px) {
   .tv-workload-row { grid-template-columns: 120px 1fr 60px; }
   .tv-teacher-chip { min-width: 120px; }
@@ -4593,9 +4852,9 @@ input::placeholder, textarea::placeholder {
   .tv-toggle-btn  { flex: 1; justify-content: center; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   HOME PAGE — full redesign
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+   HOME PAGE тАФ full redesign
+   тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР */
 
 .home-page {
   background: #0a0f1e;
@@ -4605,7 +4864,7 @@ input::placeholder, textarea::placeholder {
   font-family: 'Figtree', sans-serif;
 }
 
-/* ── Nav ── */
+/* тФАтФА Nav тФАтФА */
 .home-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 90;
   background: rgba(10,15,30,.85);
@@ -4667,7 +4926,7 @@ input::placeholder, textarea::placeholder {
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
 
-/* ── Hero ── */
+/* тФАтФА Hero тФАтФА */
 .home-hero {
   min-height: 100vh;
   display: flex; flex-direction: column;
@@ -4768,7 +5027,7 @@ input::placeholder, textarea::placeholder {
 }
 .home-stat-lbl { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 3px; }
 
-/* ── Section shell ── */
+/* тФАтФА Section shell тФАтФА */
 .home-section { padding: 96px 24px; }
 .home-section-inner { max-width: 1100px; margin: 0 auto; }
 .home-section-label {
@@ -4788,7 +5047,7 @@ input::placeholder, textarea::placeholder {
   line-height: 1.7;
 }
 
-/* ── Demo video section ── */
+/* тФАтФА Demo video section тФАтФА */
 .home-demo-section { background: rgba(255,255,255,.02); }
 .demo-video-wrap {
   position: relative; max-width: 880px; margin: 0 auto;
@@ -4843,12 +5102,12 @@ input::placeholder, textarea::placeholder {
 }
 .demo-cta { text-align: center; margin-top: 32px; }
 
-/* ── Animated timetable preview ── */
+/* тФАтФА Animated timetable preview тФАтФА */
 .demo-ui-preview {
   /* FIX (video not playing): lowered from z-index 2 to 1 so it sits BELOW
      the real <video> element and no longer permanently hides it. This is
      still shown by default (as the fallback when no video file is present,
-     or before the video starts playing) — see Home.jsx DemoVideo component. */
+     or before the video starts playing) тАФ see Home.jsx DemoVideo component. */
   position: relative; z-index: 1;
   min-height: 360px; display: flex;
   align-items: center; justify-content: center;
@@ -4901,7 +5160,7 @@ input::placeholder, textarea::placeholder {
   font-size: 11px; color: rgba(255,255,255,.4); margin-top: 8px;
 }
 
-/* ── Features ── */
+/* тФАтФА Features тФАтФА */
 .home-features-section { background: transparent; }
 .home-features-grid {
   display: grid;
@@ -4931,7 +5190,7 @@ input::placeholder, textarea::placeholder {
 }
 .home-feature-body { font-size: 14px; color: rgba(255,255,255,.55); line-height: 1.65; margin: 0; }
 
-/* ── Steps ── */
+/* тФАтФА Steps тФАтФА */
 .home-steps-section { background: rgba(255,255,255,.02); }
 .home-steps-grid {
   display: grid; grid-template-columns: repeat(4,1fr);
@@ -4960,7 +5219,7 @@ input::placeholder, textarea::placeholder {
   transform: translateY(-50%); color: rgba(255,255,255,.2); z-index: 1;
 }
 
-/* ── Curriculum ── */
+/* тФАтФА Curriculum тФАтФА */
 .home-curriculum-section { background: transparent; }
 .home-curriculum-pills {
   display: flex; flex-wrap: wrap; justify-content: center;
@@ -4975,7 +5234,7 @@ input::placeholder, textarea::placeholder {
   padding: 10px 20px; border-radius: 28px;
 }
 
-/* ── Testimonials ── */
+/* тФАтФА Testimonials тФАтФА */
 .home-testimonials-section { background: rgba(255,255,255,.02); }
 .home-testimonials-grid {
   display: grid; grid-template-columns: repeat(3,1fr); gap: 20px;
@@ -4999,7 +5258,7 @@ input::placeholder, textarea::placeholder {
 .home-testimonial-name { font-size: 13px; font-weight: 700; color: #fff; }
 .home-testimonial-role { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
 
-/* ── CTA ── */
+/* тФАтФА CTA тФАтФА */
 .home-cta-section {
   padding: 96px 24px;
   background: linear-gradient(135deg, rgba(41,82,163,.2), rgba(124,58,237,.15));
@@ -5021,7 +5280,7 @@ input::placeholder, textarea::placeholder {
   font-size: 15px; color: rgba(255,255,255,.55); margin: 0 0 32px; line-height: 1.7;
 }
 
-/* ── Footer ── */
+/* тФАтФА Footer тФАтФА */
 .home-footer {
   padding: 28px 24px;
   border-top: 1px solid rgba(255,255,255,.07);
@@ -5035,7 +5294,7 @@ input::placeholder, textarea::placeholder {
 .home-footer-links { display: flex; gap: 20px; margin-left: auto; }
 .home-footer-copy { font-size: 12px; color: rgba(255,255,255,.3); }
 
-/* ── Responsive Home ── */
+/* тФАтФА Responsive Home тФАтФА */
 @media (max-width: 1024px) {
   .home-steps-grid { grid-template-columns: repeat(2,1fr); }
   .home-step-arrow { display: none; }
