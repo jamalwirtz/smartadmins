@@ -92,6 +92,12 @@ export const teachersAPI = {
   delete:         (id)         => api.delete(`/teachers/${id}`),
   assignSubjects: (id, ids)    => api.post(`/teachers/${id}/subjects`, { subject_ids: ids }),
   schedule:       (id, draft)  => api.get(`/teachers/${id}/schedule?draft_id=${draft}`),
+  // Bulk import — CSV or .xlsx, matching the same fields as the manual form
+  importFile:     (file) => {
+    const f = new FormData(); f.append('file', file)
+    return api.post('/teachers/import', f, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  importTemplate: () => `${BASE}/teachers/import/template`,
 }
 
 // ── Subjects ──────────────────────────────────────────────────────────────────
@@ -100,6 +106,11 @@ export const subjectsAPI = {
   create: (data)     => api.post('/subjects', data),
   update: (id, data) => api.put(`/subjects/${id}`, data),
   delete: (id)       => api.delete(`/subjects/${id}`),
+  importFile:     (file) => {
+    const f = new FormData(); f.append('file', file)
+    return api.post('/subjects/import', f, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  importTemplate: () => `${BASE}/subjects/import/template`,
 }
 
 // ── Classes ───────────────────────────────────────────────────────────────────
@@ -108,6 +119,11 @@ export const classesAPI = {
   create: (data)     => api.post('/classes', data),
   update: (id, data) => api.put(`/classes/${id}`, data),
   delete: (id)       => api.delete(`/classes/${id}`),
+  importFile:     (file) => {
+    const f = new FormData(); f.append('file', file)
+    return api.post('/classes/import', f, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  importTemplate: () => `${BASE}/classes/import/template`,
 }
 
 // ── Schedules ─────────────────────────────────────────────────────────────────
@@ -245,6 +261,8 @@ export const exportAPI = {
                  api.get(`/export/draft/${draft_id}/pdf`,  { responseType: 'blob' }),
   draftXlsx:   (draft_id) =>
                  api.get(`/export/draft/${draft_id}/xlsx`, { responseType: 'blob' }),
+  draftCsv:    (draft_id) =>
+                 api.get(`/export/draft/${draft_id}/csv`,  { responseType: 'blob' }),
   teacherPdf:  (teacher_id, draft_id) =>
                  api.get(`/export/teacher/${teacher_id}/pdf?draft_id=${draft_id}`, { responseType: 'blob' }),
   emailTeacher:(teacher_id, draft_id, custom_message = '') =>
