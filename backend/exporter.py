@@ -335,12 +335,58 @@ def _thin_border():
     return Border(left=s, right=s, top=s, bottom=s)
 
 
-class ExcelExporter:
+class ExcelExporter(PDFExporter):
+    """
+    FIX: previously `class ExcelExporter:` stood alone with no relationship
+    to PDFExporter, so exam_pdf() below had no access to _header() /
+    _school_info() and had to hand-roll its own header using the hardcoded
+    cfg.SCHOOL_NAME default — it could never show the uploaded badge/logo
+    or a school name edited in Settings. Inheriting from PDFExporter gives
+    it access to the same header/theme helpers the timetable PDF already
+    uses correctly, while ExcelExporter's own _check() below still
+    overrides PDFExporter's (openpyxl vs reportlab availability).
+    """
 
     def _check(self):
         if not XLSX:
             from fastapi import HTTPException
             raise HTTPException(503, "openpyxl not installed. Run: pip install openpyxl")
+
+    # ── Timetable → CSV (flat, lightweight) ───────────────────────────────────
+
+    def timetable_csv(self, draft, db: Session) -> str:
+        """Flat, single-sheet CSV — one row per scheduled lesson. A lighter
+        alternative to the multi-sheet .xlsx export for people who just want
+        the raw data to drop into a spreadsheet or database tool."""
+        import csv, io
+        from models import ClassSection, Subject, Teacher, TimetableSlot
+
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["Class", "Grade", "Day", "Period", "Subject", "Teacher"])
+
+        slots = (
+            db.query(TimetableSlot)
+            .filter(TimetableSlot.draft_id == draft.id)
+            .order_by(TimetableSlot.class_id, TimetableSlot.day, TimetableSlot.period)
+            .all()
+        )
+        cls_map  = {c.id: c for c in db.query(ClassSection).all()}
+        subj_map = {s.id: s for s in db.query(Subject).all()}
+        tchr_map = {t.id: t for t in db.query(Teacher).all()}
+
+        for s in slots:
+            if not s.subject_id:
+                continue
+            cls  = cls_map.get(s.class_id)
+            subj = subj_map.get(s.subject_id)
+            tchr = tchr_map.get(s.teacher_id) if s.teacher_id else None
+            w.writerow([
+                cls.name if cls else "", cls.grade_level if cls else "",
+                s.day, s.period,
+                subj.name if subj else "", tchr.name if tchr else "",
+            ])
+        return buf.getvalue()
 
     # ── Timetable → Excel ─────────────────────────────────────────────────────
 
@@ -362,8 +408,11 @@ class ExcelExporter:
         classes  = db.query(ClassSection).order_by(ClassSection.grade_level, ClassSection.name).all()
 
         # ── Summary sheet ─────────────────────────────────────────────────────
+        # FIX: was hardcoded to cfg.SCHOOL_NAME (the static default), so
+        # editing the school name in Settings never showed up here.
+        school_name = self._school_info(db)["name"]
         ws_sum = wb.create_sheet("Summary")
-        ws_sum["A1"] = cfg.SCHOOL_NAME
+        ws_sum["A1"] = school_name
         ws_sum["A1"].font = Font(bold=True, size=16, color=_NAVY)
         ws_sum["A2"] = f"Timetable: {draft.name}   |   Academic Year: {cfg.ACADEMIC_YEAR}"
         ws_sum["A2"].font = Font(italic=True, size=11, color="555555")
@@ -404,7 +453,7 @@ class ExcelExporter:
         # ── One sheet per class ───────────────────────────────────────────────
         for cls in classes:
             ws = wb.create_sheet(f"Class {cls.name}")
-            ws["A1"] = f"{cfg.SCHOOL_NAME} — Class {cls.name} (Grade {cls.grade_level})"
+            ws["A1"] = f"{school_name} — Class {cls.name} (Grade {cls.grade_level})"
             ws["A1"].font = Font(bold=True, size=13, color=_NAVY)
             ws.merge_cells(f"A1:{get_column_letter(len(days)+1)}1")
 
@@ -473,19 +522,19 @@ class ExcelExporter:
         story = []
         styles = getSampleStyleSheet()
 
-        # Header
-        title_style = ParagraphStyle("T", parent=styles["Title"], fontSize=16,
-                                      textColor=colors.HexColor("#1E3A5F"), spaceAfter=2)
-        sub_style   = ParagraphStyle("S", parent=styles["Normal"], fontSize=9,
-                                      textColor=colors.grey, spaceAfter=8)
-        story.append(Paragraph(cfg.SCHOOL_NAME, title_style))
+        # FIX: this used to build its own header from scratch with
+        # cfg.SCHOOL_NAME (a static default) and never touched the database
+        # at all, so the uploaded badge/logo — and any school name edited
+        # in Settings — never appeared on exam PDFs. Reusing _header() (now
+        # available via inheritance from PDFExporter) fixes both.
+        self._header(story, f"Exam Timetable — {session.name}", db)
+
+        sub_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=9,
+                                    textColor=colors.grey, spaceAfter=8)
         story.append(Paragraph(
-            f"Exam Timetable: {session.name}  |  "
-            f"{session.start_date} to {session.end_date}  |  "
-            f"Academic Year: {cfg.ACADEMIC_YEAR}",
-            sub_style,
+            f"{session.start_date} to {session.end_date}", sub_style
         ))
-        story.append(Spacer(1, 0.3*cm))
+        story.append(Spacer(1, 0.2*cm))
 
         slots = (
             db.query(ExamSlot)
@@ -588,8 +637,10 @@ class ExcelExporter:
             inc_sup, inc_room = True, True
 
         # ── Overview sheet ────────────────────────────────────────────────────
+        # FIX: was hardcoded to cfg.SCHOOL_NAME (the static default).
+        school_name = self._school_info(db)["name"]
         ws_ov = wb.create_sheet("Overview")
-        ws_ov["A1"] = cfg.SCHOOL_NAME
+        ws_ov["A1"] = school_name
         ws_ov["A1"].font = Font(bold=True, size=16, color=_EXAM_H)
         ws_ov["A2"] = f"Exam Session: {session.name}   |   {session.start_date} → {session.end_date}"
         ws_ov["A2"].font = Font(italic=True, size=11, color="555555")

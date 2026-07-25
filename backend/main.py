@@ -12,7 +12,7 @@ from config import get_settings
 from database import Base, engine
 import models  # noqa: registers all ORM models
 
-import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings, allocations, education_systems, rooms, supervisors
+import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings, allocations, education_systems, rooms, supervisors, import_export
 import ws_routes as websockets
 
 settings = get_settings()
@@ -217,6 +217,7 @@ app.include_router(allocations.router,       prefix="",  tags=["Allocations"])
 app.include_router(education_systems.router, prefix="",  tags=["Education Systems"])
 app.include_router(rooms.router,             prefix="",  tags=["Rooms"])
 app.include_router(supervisors.router,       prefix="",  tags=["Supervisors"])
+app.include_router(import_export.router,     prefix="",  tags=["Import/Export"])
 app.include_router(websockets.router, tags=["WebSockets"])
 
 

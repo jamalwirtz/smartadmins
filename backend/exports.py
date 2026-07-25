@@ -83,6 +83,22 @@ def export_draft_xlsx(draft_id: str, db: Session = Depends(get_db),
     )
 
 
+@router.get("/draft/{draft_id}/csv")
+def export_draft_csv(draft_id: str, db: Session = Depends(get_db),
+                     _=Depends(get_current_user)):
+    """Export a timetable draft as a flat CSV — one row per lesson. Useful
+    for importing into spreadsheets or other database/scheduling tools."""
+    draft = db.get(TimetableDraft, draft_id)
+    if not draft:
+        raise HTTPException(404, "Draft not found")
+    csv_text = xlsx_exporter.timetable_csv(draft, db)
+    safe = draft.name.replace(" ", "_").replace("/", "-")
+    return StreamingResponse(
+        iter([csv_text]), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="timetable_{safe}.csv"'},
+    )
+
+
 @router.get("/exam/{session_id}/pdf")
 def export_exam_pdf(session_id: str, db: Session = Depends(get_db),
                     _=Depends(get_current_user)):
