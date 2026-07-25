@@ -17,13 +17,14 @@ import Classes     from './pages/Classes'
 import Timetable   from './pages/Timetable'
 import TeacherView from './pages/TeacherView'
 import Settings    from './pages/Settings'
+import Branding    from './pages/Branding'
 import Exams       from './pages/Exams'
 import Walkthrough from './components/Walkthrough'
 
 import {
   LayoutDashboard, Users, BookOpen, School, CalendarDays, UserCheck, Clock,
   LogOut, Sun, Moon, Settings as SettingsIcon, ChevronDown, Bell,
-  HelpCircle, GraduationCap, Menu, X as XIcon
+  HelpCircle, GraduationCap, Menu, X as XIcon, Palette
 } from 'lucide-react'
 
 // ── Page transition config ────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ const PAGE_TITLES = {
   '/exams':        { label: 'Exams',        icon: <GraduationCap size={15}/> },
   '/teacher-view': { label: 'Teacher View', icon: <UserCheck size={15}/> },
   '/settings':          { label: 'Settings',          icon: <SettingsIcon size={15}/> },
+  '/branding':          { label: 'Branding & Appearance', icon: <Palette size={15}/> },
   '/schedule-settings': { label: 'Schedule Settings',  icon: <Clock size={15}/> },
 }
 
@@ -212,6 +214,7 @@ function Sidebar({ user, onLogout, onClose, photoUrl }) {
 
         <div className="nav-section-label">Account</div>
         <NavItem to="/settings"          icon={<SettingsIcon size={16}/>}   label="Settings"     onClick={closeOnMobile}/>
+        <NavItem to="/branding"          icon={<Palette size={16}/>}          label="Branding"     onClick={closeOnMobile}/>
         <NavItem to="/schedule-settings" icon={<Clock size={16}/>}            label="Schedule Config" onClick={closeOnMobile}/>
       </nav>
 
@@ -330,6 +333,7 @@ export default function App() {
                 <Route path="/exams"        element={<motion.div key="ex"    {...pageVariants}><Exams/></motion.div>}/>
                 <Route path="/teacher-view" element={<motion.div key="tv"    {...pageVariants}><TeacherView/></motion.div>}/>
                 <Route path="/settings"     element={<motion.div key="sett"  {...pageVariants}><Settings/></motion.div>}/>
+                <Route path="/branding"     element={<motion.div key="brand" {...pageVariants}><Branding/></motion.div>}/>
                 <Route path="/schedule-settings" element={<motion.div key="schset" {...pageVariants}><ScheduleSettings/></motion.div>}/>
                 <Route path="*"             element={<Navigate to="/dashboard"/>}/>
               </Routes>
