@@ -2,22 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { schoolAPI, profileAPI } from '../api/client'
+import { profileAPI } from '../api/client'
 import toast from 'react-hot-toast'
 import {
-  User, Mail, Lock, Bell, Palette, Shield, Save,
-  Eye, EyeOff, Sun, Moon, Monitor, ChevronRight,
-  Camera, Upload, Trash2, School, Clock, Globe,
-  LayoutGrid, RotateCcw, Check, Phone, MapPin
+  User, Mail, Lock, Bell, Sun, Moon, Monitor, ChevronRight,
+  Camera, Save, Eye, EyeOff, Shield, Check
 } from 'lucide-react'
-
-const THEMES = [
-  { id:'navy',  label:'Navy',   preview:['#1A237E','#E8EAF6','#9FA8DA'] },
-  { id:'green', label:'Green',  preview:['#1B5E20','#E8F5E9','#A5D6A7'] },
-  { id:'amber', label:'Amber',  preview:['#E65100','#FFF3E0','#FFCC80'] },
-  { id:'rose',  label:'Rose',   preview:['#880E4F','#FCE4EC','#F48FB1'] },
-  { id:'slate', label:'Slate',  preview:['#263238','#ECEFF1','#B0BEC5'] },
-]
 
 const pv = { initial:{opacity:0,y:12}, animate:{opacity:1,y:0,transition:{duration:.22,ease:[.4,0,.2,1]}} }
 
@@ -62,8 +52,6 @@ export default function Settings() {
   const [profile, setProfile]     = useState({ display_name:'', email:'', bio:'' })
   const [photoUrl, setPhotoUrl]   = useState(null)
   const [uploading, setUploading] = useState(false)
-  const [school, setSchool]       = useState(null)   // school settings
-  const [badgeUrl, setBadgeUrl]   = useState(null)
   const [themeMode, setThemeMode] = useState(theme)
   const [saving, setSaving]       = useState(false)
   const [passwords, setPasswords] = useState({ current:'', next:'', confirm:'' })
@@ -71,27 +59,15 @@ export default function Settings() {
   const [notifs,  setNotifs]      = useState({ draftGenerated:true, draftActivated:true, emailExports:false })
 
   const photoInput  = useRef()
-  const badgeInput  = useRef()
 
   // ── loaders ──
-  useEffect(() => {
-    loadProfile()
-    loadSchool()
-  }, [])
+  useEffect(() => { loadProfile() }, [])
 
   const loadProfile = async () => {
     try {
       const r = await profileAPI.get()
       setProfile({ display_name: r.data.display_name || '', email: user?.email || '', bio: r.data.bio || '' })
       if (r.data.has_photo) setPhotoUrl(profileAPI.photoUrl(user?.id) + '?t=' + Date.now())
-    } catch {}
-  }
-
-  const loadSchool = async () => {
-    try {
-      const r = await schoolAPI.getSettings()
-      setSchool(r.data)
-      if (r.data.has_badge) setBadgeUrl(schoolAPI.badgeUrl() + '?t=' + Date.now())
     } catch {}
   }
 
@@ -123,34 +99,6 @@ export default function Settings() {
   const handleRemovePhoto = async () => {
     try { await profileAPI.deletePhoto(); setPhotoUrl(null); if (typeof setGlobalPhoto==='function') setGlobalPhoto(null); toast.success('Photo removed') }
     catch { toast.error('Remove failed') }
-  }
-
-  // ── badge upload ──
-  const handleBadgeChange = async (e) => {
-    const file = e.target.files?.[0]; if (!file) return
-    if (file.size > 2*1024*1024) { toast.error('Max 2 MB'); return }
-    setUploading(true)
-    try {
-      await schoolAPI.uploadBadge(file)
-      setBadgeUrl(schoolAPI.badgeUrl() + '?t=' + Date.now())
-      toast.success('School badge uploaded ✅ — will appear on all PDF exports')
-    } catch { toast.error('Badge upload failed') }
-    finally { setUploading(false) }
-  }
-
-  const handleRemoveBadge = async () => {
-    try { await schoolAPI.deleteBadge(); setBadgeUrl(null); toast.success('Badge removed') }
-    catch { toast.error('Remove failed') }
-  }
-
-  // ── school settings save ──
-  const handleSchoolSave = async (e) => {
-    e.preventDefault(); setSaving(true)
-    try {
-      await schoolAPI.updateSettings(school)
-      toast.success('School settings saved ✅')
-    } catch { toast.error('Save failed') }
-    finally { setSaving(false) }
   }
 
   // ── password ──
@@ -187,8 +135,14 @@ export default function Settings() {
 
       <motion.div className="page-header" variants={pv}>
         <div>
-          <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Manage your account, school branding, and timetable preferences</p>
+          <h1 className="page-title">Account Settings</h1>
+          <p className="page-subtitle">
+            Manage your personal profile, password, and notification preferences.
+            {' '}Looking for school logo, PDF colours, or timetable appearance?{' '}
+            <a href="/branding" style={{ color:'var(--amber)', fontWeight:700, textDecoration:'none' }}>
+              Go to Branding & Appearance →
+            </a>
+          </p>
         </div>
       </motion.div>
 
@@ -253,104 +207,9 @@ export default function Settings() {
           </form>
         </Section>
 
-        {/* ── School Branding ── */}
-        <Section icon={<School size={16}/>} title="School Branding">
-          {/* Badge upload */}
-          <Row label="School Badge / Logo" hint="Shown at the top of all PDF exports">
-            <div className="settings-badge-upload">
-              {badgeUrl
-                ? <img src={badgeUrl} alt="School badge"
-                    style={{ height:56, objectFit:'contain', borderRadius:6,
-                             background:'var(--surface-2)', padding:4, border:'1px solid var(--border)' }} />
-                : <div className="settings-badge-placeholder">No badge</div>
-              }
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                <button className="btn btn-secondary btn-sm"
-                  onClick={() => badgeInput.current?.click()} disabled={uploading}>
-                  <Upload size={13}/> {badgeUrl ? 'Replace' : 'Upload'} Badge
-                </button>
-                {badgeUrl && (
-                  <button className="btn btn-sm" style={{ color:'var(--red,#ef4444)',
-                    background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)' }}
-                    onClick={handleRemoveBadge}>
-                    <Trash2 size={13}/>
-                  </button>
-                )}
-              </div>
-              <input ref={badgeInput} type="file" accept="image/png,image/jpeg,image/webp"
-                style={{ display:'none' }} onChange={handleBadgeChange} />
-            </div>
-          </Row>
-
-          {school && (
-            <form onSubmit={handleSchoolSave} className="settings-form" style={{ marginTop:16 }}>
-              <Row label="School Name" hint="Shown on PDFs and in the app">
-                <input className="settings-input" value={school.school_name || ''}
-                  onChange={e => setSchool(s => ({ ...s, school_name: e.target.value }))}
-                  placeholder="Greenfield Academy" />
-              </Row>
-              <Row label="Academic Year">
-                <input className="settings-input" value={school.academic_year || ''}
-                  onChange={e => setSchool(s => ({ ...s, academic_year: e.target.value }))}
-                  placeholder="2025/2026" style={{ maxWidth:160 }} />
-              </Row>
-              <Row label="School Motto" hint="Italic subline on PDF exports">
-                <input className="settings-input" value={school.school_motto || ''}
-                  onChange={e => setSchool(s => ({ ...s, school_motto: e.target.value }))}
-                  placeholder="Excellence in Education" />
-              </Row>
-              <Row label="Email" hint="School contact email">
-                <input className="settings-input" type="email" value={school.school_email || ''}
-                  onChange={e => setSchool(s => ({ ...s, school_email: e.target.value }))}
-                  placeholder="admin@school.edu" />
-              </Row>
-              <Row label="Phone">
-                <input className="settings-input" value={school.school_phone || ''}
-                  onChange={e => setSchool(s => ({ ...s, school_phone: e.target.value }))}
-                  placeholder="+27 12 345 6789" style={{ maxWidth:220 }} />
-              </Row>
-              <Row label="Address">
-                <input className="settings-input" value={school.school_address || ''}
-                  onChange={e => setSchool(s => ({ ...s, school_address: e.target.value }))}
-                  placeholder="123 School Road, City" />
-              </Row>
-              <Row label="Country Code" hint="For public holiday calendar (ZA, KE, US, GB…)">
-                <input className="settings-input" value={school.country_code || ''}
-                  onChange={e => setSchool(s => ({ ...s, country_code: e.target.value.toUpperCase() }))}
-                  maxLength={2} style={{ maxWidth:80 }} placeholder="ZA" />
-              </Row>
-              <div className="settings-form-footer">
-                <button type="submit" className="btn btn-accent settings-save-btn" disabled={saving}>
-                  <Save size={14}/> {saving ? 'Saving…' : 'Save school info'}
-                </button>
-              </div>
-            </form>
-          )}
-        </Section>
-
-        {/* Time configuration moved to Schedule Settings page */}
-        <motion.div className="card" variants={pv}
-          style={{background:'rgba(245,158,11,.04)',border:'1.5px solid rgba(245,158,11,.2)',
-            borderRadius:'var(--r-xl)',padding:'18px 22px',display:'flex',
-            alignItems:'center',justifyContent:'space-between',gap:12}}>
-          <div>
-            <div style={{fontWeight:700,color:'var(--text)',marginBottom:4}}>
-              ⏰ Schedule & Time Configuration
-            </div>
-            <div style={{fontSize:13,color:'var(--muted)'}}>
-              Set period durations, break times, lunch, and school days
-            </div>
-          </div>
-          <a href="/schedule-settings" className="btn btn-secondary btn-sm"
-            style={{whiteSpace:'nowrap',textDecoration:'none'}}>
-            Open Schedule Settings →
-          </a>
-        </motion.div>
-
-        {/* ── Appearance & PDF Theme ── */}
-
-        <Section icon={<Palette size={16}/>} title="Appearance & PDF Themes">
-          <Row label="App Theme" hint="Light, dark, or follow system preference">
+        {/* ── Appearance (app-wide light/dark, not PDF/branding) ── */}
+        <Section icon={<Sun size={16}/>} title="App Theme">
+          <Row label="Theme" hint="Light, dark, or follow system preference">
             <div className="settings-theme-picker">
               {[
                 { id:'light',  icon:<Sun size={18}/>,     label:'Light' },
@@ -373,119 +232,6 @@ export default function Settings() {
               ))}
             </div>
           </Row>
-
-          {/* PDF colour theme */}
-          {school && (
-            <Row label="PDF Colour Theme" hint="Applied to all exported PDFs and spreadsheets">
-              <div className="settings-pdf-themes">
-                {THEMES.map(t => (
-                  <button key={t.id}
-                    className={`settings-pdf-theme${school.timetable_theme===t.id?' selected':''}`}
-                    onClick={() => {
-                      setSchool(s => ({ ...s, timetable_theme: t.id }))
-                      schoolAPI.updateSettings({ timetable_theme: t.id })
-                        .then(() => toast.success(`PDF theme: ${t.label}`))
-                    }}>
-                    <div className="settings-pdf-swatches">
-                      {t.preview.map((c,i) => (
-                        <div key={i} style={{ background:c, flex:1 }}/>
-                      ))}
-                    </div>
-                    <span className="settings-pdf-theme-label">{t.label}</span>
-                    {school.timetable_theme===t.id && (
-                      <div className="settings-pdf-check"><Check size={10}/></div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </Row>
-          )}
-
-          {/* Timetable orientation */}
-          {school && (
-            <Row label="Timetable Orientation" hint="How the grid is displayed in the app">
-              <div style={{ display:'flex', gap:10 }}>
-                {[
-                  { id:'horizontal', label:'Horizontal', hint:'Days across top, periods down' },
-                  { id:'vertical',   label:'Vertical',   hint:'Periods across top, days down' },
-                ].map(o => (
-                  <button key={o.id}
-                    className={`settings-orientation-btn${school.timetable_orientation===o.id?' active':''}`}
-                    onClick={() => {
-                      setSchool(s => ({ ...s, timetable_orientation: o.id }))
-                      schoolAPI.updateSettings({ timetable_orientation: o.id })
-                    }}>
-                    <LayoutGrid size={14}/>
-                    <div>
-                      <div style={{ fontWeight:700, fontSize:12 }}>{o.label}</div>
-                      <div style={{ fontSize:10, color:'var(--muted)', marginTop:1 }}>{o.hint}</div>
-                    </div>
-                    {school.timetable_orientation===o.id && <Check size={12} style={{ marginLeft:'auto', color:'var(--amber)' }}/>}
-                  </button>
-                ))}
-              </div>
-            </Row>
-          )}
-
-          {/* Teacher name format */}
-          {school && (
-            <Row label="Teacher Name Format on Exports"
-                 hint="How teacher names appear in generated PDFs and spreadsheets">
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {[
-                  {id:'full_name',  label:'Full Name',   ex:'Mrs Alice Kamau'},
-                  {id:'short_name', label:'Short Name',  ex:'Mrs Kamau'},
-                  {id:'initials',   label:'Initials',    ex:'AK'},
-                ].map(opt => (
-                  <button key={opt.id}
-                    className={`settings-orientation-btn${school.teacher_name_format===opt.id?' active':''}`}
-                    style={{flexDirection:'column',alignItems:'flex-start',gap:2,minWidth:100}}
-                    onClick={() => {
-                      setSchool(s=>({...s,teacher_name_format:opt.id}))
-                      schoolAPI.updateSettings({teacher_name_format:opt.id})
-                        .then(()=>toast.success(`Name format: ${opt.label}`))
-                    }}>
-                    <div style={{fontWeight:700,fontSize:12}}>{opt.label}</div>
-                    <div style={{fontSize:10,color:'var(--muted)',fontStyle:'italic'}}>{opt.ex}</div>
-                    {school.teacher_name_format===opt.id && <Check size={11} style={{color:'var(--amber)',marginTop:2}}/>}
-                  </button>
-                ))}
-              </div>
-            </Row>
-          )}
-
-          {/* Exam export toggles */}
-          {school && (
-            <Row label="Exam Export Columns"
-                 hint="Choose which columns appear in exam PDF and Excel exports">
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:13}}>
-                  <input type="checkbox"
-                    checked={!!school.exam_include_supervisors}
-                    onChange={e=>{
-                      setSchool(s=>({...s,exam_include_supervisors:e.target.checked}))
-                      schoolAPI.updateSettings({exam_include_supervisors:e.target.checked})
-                    }}/>
-                  <div>
-                    <div style={{fontWeight:600,color:'var(--text)'}}>Include Supervisors column</div>
-                    <div style={{fontSize:11,color:'var(--muted)'}}>Show invigilator names in exam exports</div>
-                  </div>
-                </label>
-                <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:13}}>
-                  <input type="checkbox"
-                    checked={!!school.exam_include_rooms}
-                    onChange={e=>{
-                      setSchool(s=>({...s,exam_include_rooms:e.target.checked}))
-                      schoolAPI.updateSettings({exam_include_rooms:e.target.checked})
-                    }}/>
-                  <div>
-                    <div style={{fontWeight:600,color:'var(--text)'}}>Include Rooms column</div>
-                    <div style={{fontSize:11,color:'var(--muted)'}}>Show room names in exam exports</div>
-                  </div>
-                </label>
-              </div>
-            </Row>
-          )}
         </Section>
 
         {/* ── Password ── */}

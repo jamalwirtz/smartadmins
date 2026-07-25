@@ -10,7 +10,8 @@ import { useDraftWS } from '../hooks/useWebSocket'
 import toast from 'react-hot-toast'
 import {
   Zap, RefreshCw, Lock, Unlock, Download, CheckCircle, Check,
-  Trash2, ShieldCheck, Users, Eye, Palette, X, CalendarDays, Pencil, Plus
+  Trash2, ShieldCheck, Users, Eye, Palette, X, CalendarDays, Pencil, Plus,
+  ChevronDown, FileSpreadsheet, FileText
 } from 'lucide-react'
 
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday']
@@ -49,17 +50,22 @@ function TimetableCell({ slot, onLock, onEditSlot }) {
 
   const stype    = SLOT_TYPES[slot.slot_type] || SLOT_TYPES.lesson
   const isSpecial = slot.slot_type && slot.slot_type !== 'lesson'
-  const bg       = isSpecial ? stype.bg
-    : slot.subject_color ? `${slot.subject_color}1a` : '#f0f4ff'
-  const border   = isSpecial ? `${stype.color}55`
-    : slot.subject_color ? `${slot.subject_color}40` : 'var(--border)'
-  const textCol  = isSpecial ? stype.color : (slot.subject_color || 'var(--navy-900)')
+  // FIX: previously the whole cell background was filled with the raw
+  // subject color at ~10% opacity, and the subject-color text sat directly
+  // on top. In dark mode that tint barely differed from the page background
+  // and the (light-mode-tuned) dark saturated subject colors were hard to
+  // read; in light mode the pastel fill plus colored text also read as
+  // "busy"/generic. Now every cell uses the normal theme card surface with
+  // a colored left accent stripe (like the exam-slot cards), which keeps
+  // strong, theme-correct contrast regardless of which subject color is used.
+  const accentColor = isSpecial ? stype.color : (slot.subject_color || 'var(--blue-400)')
+  const textCol  = isSpecial ? stype.color : (slot.subject_color || 'var(--text)')
 
   return (
     <motion.div
       ref={setNodeRef}
       className={`tt-cell${slot.is_locked ? ' locked' : ''}${isSpecial ? ' tt-cell-special' : ''}`}
-      style={{ background:bg, borderColor:border, ...style }}
+      style={{ borderLeftColor: slot.is_locked ? undefined : accentColor, ...style }}
       layout initial={{ opacity:0, scale:0.9 }}
       animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.8 }}
       transition={{ duration:0.2 }}
@@ -252,6 +258,55 @@ function TimetableGrid({ slots, classes, onLock, onMove, activeDraftId }) {
   )
 }
 
+// ── Export dropdown (PDF / CSV / Excel) ───────────────────────────────────────
+function TimetableExportDropdown({ onPdf, onCsv, onXlsx }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef()
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  return (
+    <div className="exam-export-wrap" ref={ref}>
+      <button className="btn btn-teal btn-sm" onClick={() => setOpen(o => !o)}>
+        <Download size={13}/> Export <ChevronDown size={11}/>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div className="exam-export-dropdown"
+            initial={{ opacity:0, y:-6, scale:.97 }}
+            animate={{ opacity:1, y:0, scale:1 }}
+            exit={{ opacity:0, y:-6, scale:.97 }}>
+            <button className="exam-export-item" onClick={() => { onPdf(); setOpen(false) }}>
+              <FileText size={14} color="#ef4444"/>
+              <div>
+                <div className="exam-export-item-title">Export as PDF</div>
+                <div className="exam-export-item-sub">One class per page, print-ready</div>
+              </div>
+            </button>
+            <button className="exam-export-item" onClick={() => { onCsv(); setOpen(false) }}>
+              <FileSpreadsheet size={14} color="#0ea5e9"/>
+              <div>
+                <div className="exam-export-item-title">Export as CSV</div>
+                <div className="exam-export-item-sub">Flat data — for spreadsheets or databases</div>
+              </div>
+            </button>
+            <button className="exam-export-item" onClick={() => { onXlsx(); setOpen(false) }}>
+              <FileSpreadsheet size={14} color="#22c55e"/>
+              <div>
+                <div className="exam-export-item-title">Export as Excel</div>
+                <div className="exam-export-item-sub">Multi-sheet workbook, one tab per class</div>
+              </div>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ── Draft card ────────────────────────────────────────────────────────────────
 function DraftCard({ draft, isSelected, onSelect, onActivate, onDelete }) {
   return (
@@ -437,6 +492,28 @@ export default function Timetable() {
     } catch { toast.error('PDF export failed — ensure ReportLab is installed') }
   }
 
+  const downloadCsv = async () => {
+    if (!selectedDraftId) return
+    try {
+      const r = await exportAPI.draftCsv(selectedDraftId)
+      const url = URL.createObjectURL(new Blob([r.data], { type:'text/csv' }))
+      const a = document.createElement('a'); a.href = url; a.download = `timetable_${draftDetail?.name || 'draft'}.csv`; a.click()
+      URL.revokeObjectURL(url)
+      toast.success('CSV downloaded')
+    } catch { toast.error('CSV export failed') }
+  }
+
+  const downloadXlsx = async () => {
+    if (!selectedDraftId) return
+    try {
+      const r = await exportAPI.draftXlsx(selectedDraftId)
+      const url = URL.createObjectURL(new Blob([r.data], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+      const a = document.createElement('a'); a.href = url; a.download = `timetable_${draftDetail?.name || 'draft'}.xlsx`; a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Excel file downloaded')
+    } catch { toast.error('Excel export failed — ensure openpyxl is installed') }
+  }
+
   const currentDraft = drafts.find(d => d.id === selectedDraftId)
 
   return (
@@ -474,9 +551,7 @@ export default function Timetable() {
             <button className="btn btn-ghost btn-sm" onClick={validate} disabled={validating}>
               <ShieldCheck size={13} /> Validate
             </button>
-            <button className="btn btn-teal btn-sm" onClick={downloadPdf}>
-              <Download size={13} /> PDF
-            </button>
+            <TimetableExportDropdown onPdf={downloadPdf} onCsv={downloadCsv} onXlsx={downloadXlsx} />
             <button className="btn btn-ghost btn-sm" onClick={() => setShowPdfPanel(p => !p)}
               title="PDF & export settings" style={{padding:'5px 8px'}}>
               <Palette size={13} />
@@ -662,10 +737,18 @@ export default function Timetable() {
                 ))}
               </div>
 
-              <div style={{marginTop:20,display:'flex',gap:8}}>
-                <button className="btn btn-accent" style={{flex:1}} onClick={downloadPdf}
+              <div style={{marginTop:20,display:'flex',gap:8,flexWrap:'wrap'}}>
+                <button className="btn btn-accent" style={{flex:1,minWidth:120}} onClick={downloadPdf}
                   disabled={!selectedDraftId}>
-                  <Download size={13}/> Download PDF
+                  <Download size={13}/> PDF
+                </button>
+                <button className="btn btn-secondary" style={{flex:1,minWidth:120}} onClick={downloadCsv}
+                  disabled={!selectedDraftId}>
+                  <FileSpreadsheet size={13}/> CSV
+                </button>
+                <button className="btn btn-secondary" style={{flex:1,minWidth:120}} onClick={downloadXlsx}
+                  disabled={!selectedDraftId}>
+                  <FileSpreadsheet size={13}/> Excel
                 </button>
               </div>
               {savingPdf && <div style={{fontSize:11,color:'var(--muted)',textAlign:'center',marginTop:6}}>Saving…</div>}

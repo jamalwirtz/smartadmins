@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import {
   Plus, School, Pencil, Trash2, ChevronRight, ChevronLeft,
   Check, X, BookOpen, Users, Clock, Search,
-  AlertCircle, CheckCircle, ArrowRight
+  AlertCircle, CheckCircle, ArrowRight, Upload, Download
 } from 'lucide-react'
 
 // ── Wizard step definitions ───────────────────────────────────────────────────
@@ -84,6 +84,10 @@ export default function Classes() {
   const [newTeacherEmail, setNewTeacherEmail] = useState('')
   const [creatingTeacher, setCreatingTeacher] = useState(false)
 
+  // Bulk import
+  const importInputRef = useRef()
+  const [importing, setImporting] = useState(false)
+
   // ── Data loading ─────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
@@ -107,6 +111,29 @@ export default function Classes() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // ── Bulk import — CSV or .xlsx, same fields as the wizard's Step 1 ────────
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const r = await classesAPI.importFile(file)
+      toast.success(r.data.message, { duration: 5000 })
+      if (r.data.errors?.length) {
+        r.data.errors.slice(0, 5).forEach(err => toast.error(err, { duration: 6000 }))
+        if (r.data.errors.length > 5) {
+          toast(`+${r.data.errors.length - 5} more row(s) skipped`, { icon: 'ℹ️' })
+        }
+      }
+      load()
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Import failed')
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
 
   // ── Wizard helpers ────────────────────────────────────────────────────────
   const resetWizard = () => {
@@ -205,6 +232,20 @@ export default function Classes() {
     } catch (e) { toast.error(e?.response?.data?.detail || 'Delete failed') }
   }
 
+  const createTeacherInline = async (subjectId) => {
+    if (!newTeacherName.trim()) { toast.error('Teacher name required'); return }
+    setCreatingTeacher(true)
+    try {
+      const r = await teachersAPI.create({ name: newTeacherName.trim(), email: newTeacherEmail.trim() || undefined })
+      const newT = r.data
+      setTeachers(prev => [...prev, newT])
+      setTeacherMap(m => ({ ...m, [subjectId]: newT.id }))
+      setNewTeacherName(''); setNewTeacherEmail(''); setAddingTeacher(false)
+      toast.success(`"${newT.name}" created and assigned ✅`)
+    } catch (e) { toast.error(e?.response?.data?.detail || 'Failed to create teacher') }
+    finally { setCreatingTeacher(false) }
+  }
+
   // ── Derived data ──────────────────────────────────────────────────────────
   const filteredSubjects = subjects.filter(s =>
     s.name.toLowerCase().includes(subSearch.toLowerCase()) ||
@@ -236,9 +277,19 @@ export default function Classes() {
             {pendingCount === 0 && 'All teachers assigned'}
           </p>
         </div>
-        <button className="btn btn-accent" onClick={openCreate}>
-          <Plus size={15}/> New Class
-        </button>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          <button className="btn btn-secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
+            <Upload size={15}/> {importing ? 'Importing…' : 'Import CSV/Excel'}
+          </button>
+          <a href={classesAPI.importTemplate()} className="btn btn-ghost btn-sm" style={{textDecoration:'none'}}>
+            <Download size={13}/> Template
+          </a>
+          <input ref={importInputRef} type="file" accept=".csv,.xlsx"
+            style={{ display:'none' }} onChange={handleImportFile} />
+          <button className="btn btn-accent" onClick={openCreate}>
+            <Plus size={15}/> New Class
+          </button>
+        </div>
       </motion.div>
 
       {/* ── Wizard modal ── */}

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { subjectsAPI } from '../api/client'
 import toast from 'react-hot-toast'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Upload, Download } from 'lucide-react'
 
 const empty = { name: '', grade_level: '', weekly_periods: 4, allows_double_period: false, is_static_eligible: false, color_hex: '#1565c0' }
 const COLORS = ['#1565c0','#6a1b9a','#2e7d32','#bf360c','#0277bd','#e65100','#558b2f','#004d40','#4a148c','#880e4f']
@@ -12,6 +12,8 @@ export default function Subjects() {
   const [form, setForm] = useState(empty)
   const [editId, setEditId] = useState(null)
   const [saving, setSaving] = useState(false)
+  const importInputRef = useRef()
+  const [importing, setImporting] = useState(false)
 
   const load = () => subjectsAPI.list().then(r => setSubjects(r.data))
   useEffect(() => { load() }, [])
@@ -39,6 +41,29 @@ export default function Subjects() {
     await subjectsAPI.delete(id); toast.success('Deleted'); load()
   }
 
+  // ── Bulk import — CSV or .xlsx, same fields as the manual form above ──────
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const r = await subjectsAPI.importFile(file)
+      toast.success(r.data.message, { duration: 5000 })
+      if (r.data.errors?.length) {
+        r.data.errors.slice(0, 5).forEach(err => toast.error(err, { duration: 6000 }))
+        if (r.data.errors.length > 5) {
+          toast(`+${r.data.errors.length - 5} more row(s) skipped`, { icon: 'ℹ️' })
+        }
+      }
+      load()
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Import failed')
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
+
   // Group by grade
   const grades = [...new Set(subjects.map(s => s.grade_level))].sort()
 
@@ -47,6 +72,14 @@ export default function Subjects() {
       <div className="topbar">
         <h2>Subjects</h2>
         <div className="topbar-actions">
+          <button className="btn btn-secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
+            <Upload size={15} /> {importing ? 'Importing…' : 'Import CSV/Excel'}
+          </button>
+          <a href={subjectsAPI.importTemplate()} className="btn btn-ghost btn-sm" style={{textDecoration:'none'}}>
+            <Download size={13}/> Template
+          </a>
+          <input ref={importInputRef} type="file" accept=".csv,.xlsx"
+            style={{ display:'none' }} onChange={handleImportFile} />
           <button className="btn btn-primary" onClick={openCreate}><Plus size={15} /> Add Subject</button>
         </div>
       </div>

@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Plus, Pencil, Trash2, BookOpen, X, Save,
   User, Mail, Phone, Clock, Calendar,
-  CheckCircle, ChevronRight, Search
+  CheckCircle, ChevronRight, Search, Upload, Download
 } from 'lucide-react'
 
 const DAYS   = ['Monday','Tuesday','Wednesday','Thursday','Friday']
@@ -34,6 +34,9 @@ export default function Teachers() {
   const [qaSubject,     setQaSubject]     = useState('')
   const [qaClass,       setQaClass]       = useState('')
   const [qaPeriods,     setQaPeriods]     = useState(4)
+  // Bulk import
+  const importInputRef = useRef()
+  const [importing, setImporting] = useState(false)
 
   const load = async () => {
     const [t, s, c] = await Promise.all([
@@ -122,6 +125,29 @@ export default function Teachers() {
   const toggleSubject = (id) =>
     setSelectedSubs(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id])
 
+  // ── Bulk import — CSV or .xlsx, same fields as the manual form above ──────
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const r = await teachersAPI.importFile(file)
+      toast.success(r.data.message, { duration: 5000 })
+      if (r.data.errors?.length) {
+        r.data.errors.slice(0, 5).forEach(err => toast.error(err, { duration: 6000 }))
+        if (r.data.errors.length > 5) {
+          toast(`+${r.data.errors.length - 5} more row(s) skipped`, { icon: 'ℹ️' })
+        }
+      }
+      load()
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Import failed')
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
+
   const daysOff = form.days_off.split(',').map(d=>d.trim()).filter(Boolean)
 
   const filtered = teachers.filter(t =>
@@ -138,9 +164,19 @@ export default function Teachers() {
           <h1 className="page-title">Teachers</h1>
           <p className="page-subtitle">{teachers.length} staff member{teachers.length!==1?'s':''} · manage and assign subjects</p>
         </div>
-        <button className="btn btn-accent" onClick={openCreate}>
-          <Plus size={15}/> Add Teacher
-        </button>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          <button className="btn btn-secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
+            <Upload size={15}/> {importing ? 'Importing…' : 'Import CSV/Excel'}
+          </button>
+          <a href={teachersAPI.importTemplate()} className="btn btn-ghost btn-sm" style={{textDecoration:'none'}}>
+            <Download size={13}/> Template
+          </a>
+          <input ref={importInputRef} type="file" accept=".csv,.xlsx"
+            style={{ display:'none' }} onChange={handleImportFile} />
+          <button className="btn btn-accent" onClick={openCreate}>
+            <Plus size={15}/> Add Teacher
+          </button>
+        </div>
       </motion.div>
 
       <div className="teacher-layout">
