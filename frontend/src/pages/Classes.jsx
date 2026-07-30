@@ -22,9 +22,6 @@ const STEPS = [
 const GRADES = ['1','2','3','4','5','6','7','8','9','10','11','12',
                 'S1','S2','S3','S4','S5','S6','Form 1','Form 2','Form 3','Form 4']
 
-const COLORS = ['#2952a3','#0d9488','#d97706','#7c3aed','#dc2626','#0891b2','#16a34a','#c2410c']
-const avatarBg = (name='') => COLORS[name.charCodeAt(0) % COLORS.length] || COLORS[0]
-
 // ── Wizard step indicator ─────────────────────────────────────────────────────
 function StepBar({ current }) {
   return (
@@ -194,7 +191,7 @@ export default function Classes() {
         subject_code: newSubjectCode.trim(),
         grade_level: classForm.grade_level,
         weekly_periods: 4,
-        color_hex: COLORS[Math.floor(Math.random()*COLORS.length)],
+        color_hex: '#38bdf8',
       })
       const newSubj = r.data
       setSubjects(prev => [...prev, newSubj])
@@ -563,10 +560,10 @@ export default function Classes() {
                       transition={{type:'spring',stiffness:300,delay:.1}}
                       style={{
                         width:64,height:64,borderRadius:'50%',margin:'0 auto 20px',
-                        background:'rgba(16,185,129,.12)',
+                        background:'rgba(74,222,128,.12)',
                         display:'flex',alignItems:'center',justifyContent:'center',
                       }}>
-                      <CheckCircle size={32} color="#10b981"/>
+                      <CheckCircle size={32} color="#16a34a"/>
                     </motion.div>
                     <h3 style={{fontSize:20,fontWeight:800,color:'var(--text)',marginBottom:8}}>
                       Setup Complete!
@@ -575,14 +572,14 @@ export default function Classes() {
                       {saveResult.message}
                     </p>
                     <div style={{display:'flex',gap:16,justifyContent:'center',flexWrap:'wrap'}}>
-                      <div className="wiz-result-stat" style={{background:'rgba(16,185,129,.08)',border:'1px solid rgba(16,185,129,.2)'}}>
-                        <span style={{fontSize:28,fontWeight:900,color:'#10b981'}}>{saveResult.assigned_count}</span>
-                        <span style={{fontSize:12,color:'#10b981'}}>Assigned</span>
+                      <div className="wiz-result-stat" style={{background:'rgba(74,222,128,.08)',border:'1px solid rgba(74,222,128,.2)'}}>
+                        <span style={{fontSize:28,fontWeight:900,color:'#16a34a'}}>{saveResult.assigned_count}</span>
+                        <span style={{fontSize:12,color:'#16a34a'}}>Assigned</span>
                       </div>
                       {saveResult.pending_count>0&&(
-                        <div className="wiz-result-stat" style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.2)'}}>
-                          <span style={{fontSize:28,fontWeight:900,color:'#f59e0b'}}>{saveResult.pending_count}</span>
-                          <span style={{fontSize:12,color:'#f59e0b'}}>Pending</span>
+                        <div className="wiz-result-stat" style={{background:'rgba(56,189,248,.08)',border:'1px solid rgba(56,189,248,.2)'}}>
+                          <span style={{fontSize:28,fontWeight:900,color:'#0284c7'}}>{saveResult.pending_count}</span>
+                          <span style={{fontSize:12,color:'#0284c7'}}>Pending</span>
                         </div>
                       )}
                     </div>
@@ -618,14 +615,13 @@ export default function Classes() {
       {loading ? (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:16}}>
           {[1,2,3].map(i=>(
-            <div key={i} style={{height:160,background:'var(--surface)',
-              border:'1px solid var(--border)',borderRadius:'var(--r-xl)',
-              animation:'pulse 1.5s ease-in-out infinite'}}/>
+            <div key={i} className="skeleton-block" style={{height:160,
+              borderRadius:'var(--r-xl)'}}/>
           ))}
         </div>
       ) : filteredClasses.length === 0 ? (
         <div className="exam-empty">
-          <School size={44} style={{color:'var(--muted)'}}/>
+          <div className="teacher-empty-icon-wrap"><School size={26} color="var(--blue-400)"/></div>
           <h3 className="exam-empty-title">
             {classSearch?'No matching classes':'No classes yet'}
           </h3>
@@ -646,8 +642,7 @@ export default function Classes() {
                 initial={{opacity:0,y:16}} animate={{opacity:1,y:0}}
                 transition={{delay:i*.04}}>
                 <div className="class-card-top">
-                  <div className="class-avatar"
-                    style={{background:avatarBg(cls.name)}}>
+                  <div className="class-avatar">
                     {cls.name.slice(0,2).toUpperCase()}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
@@ -672,9 +667,9 @@ export default function Classes() {
                       <span key={a.id}
                         className={`class-alloc-pill${a.status==='pending'?' pending':''}`}
                         style={a.status==='assigned'
-                          ?{background:`${a.subject_color||'#6366f1'}18`,
-                            color:a.subject_color||'#6366f1',
-                            borderColor:`${a.subject_color||'#6366f1'}44`}:{}}>
+                          ?{background:`${a.subject_color||'#38bdf8'}18`,
+                            color:a.subject_color||'#38bdf8',
+                            borderColor:`${a.subject_color||'#38bdf8'}44`}:{}}>
                         {a.subject_name}
                         {a.status==='pending'&&' ⏳'}
                       </span>
@@ -694,7 +689,7 @@ export default function Classes() {
 
                 <div style={{marginTop:12,fontSize:12,color:'var(--muted)',
                   display:'flex',gap:12}}>
-                  {assigned>0&&<span style={{color:'#10b981'}}>✓ {assigned} assigned</span>}
+                  {assigned>0&&<span style={{color:'#16a34a'}}>✓ {assigned} assigned</span>}
                   {pending>0 &&<span style={{color:'#f59e0b'}}>⏳ {pending} pending</span>}
                 </div>
 
@@ -706,9 +701,7 @@ export default function Classes() {
                     onClick={()=>navigate('/teachers', { state: { classId: cls.id, className: cls.name } })}>
                     <Users size={13}/> Assign Teachers
                   </button>
-                  <button className="btn btn-sm"
-                    style={{marginLeft:'auto',color:'var(--red,#ef4444)',
-                      background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)'}}
+                  <button className="btn btn-sm delete-btn" style={{marginLeft:'auto'}}
                     onClick={()=>deleteClass(cls.id)}>
                     <Trash2 size={13}/>
                   </button>

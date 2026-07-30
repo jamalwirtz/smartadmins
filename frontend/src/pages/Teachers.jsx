@@ -9,9 +9,7 @@ import {
 } from 'lucide-react'
 
 const DAYS   = ['Monday','Tuesday','Wednesday','Thursday','Friday']
-const COLORS = ['#2952a3','#0d9488','#d97706','#7c3aed','#dc2626','#0891b2','#16a34a']
 const initials = name => name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-const avatarColor = name => COLORS[name.charCodeAt(0) % COLORS.length]
 
 const empty = {
   name:'', email:'', phone:'',
@@ -199,7 +197,7 @@ export default function Teachers() {
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {filtered.length === 0 && (
               <div className="exam-empty" style={{ padding:'40px 0' }}>
-                <User size={36} style={{ color:'var(--muted)' }}/>
+                <div className="teacher-empty-icon-wrap"><User size={26} color="var(--blue-400)"/></div>
                 <p style={{ color:'var(--muted)', margin:8 }}>
                   {search ? 'No teachers match your search' : 'No teachers yet'}
                 </p>
@@ -220,7 +218,6 @@ export default function Teachers() {
                   onClick={() => openAssign(t)}>
 
                   <div className="teacher-avatar"
-                    style={{ background: avatarColor(t.name) }}
                     title={`Initials: ${t.initials || initials(t.name)} | Short: ${t.short_name || t.name}`}>
                     {t.initials || initials(t.name)}
                   </div>
@@ -229,24 +226,24 @@ export default function Teachers() {
                     <div className="teacher-name">{t.name}</div>
                     <div className="teacher-meta">
                       {t.email || 'No email'} ·{' '}
-                      <span style={{ color: t.is_part_time ? '#f59e0b' : '#10b981' }}>
+                      <span className={`teacher-status-pill ${t.is_part_time ? 'part' : 'full'}`}>
                         {t.is_part_time ? 'Part-time' : 'Full-time'}
                       </span>
                       {' '}· {t.max_weekly_hours}h/wk
                     </div>
-                    <div style={{ marginTop:5, display:'flex', gap:5, flexWrap:'wrap' }}>
+                    <div style={{ marginTop:7, display:'flex', gap:6, flexWrap:'wrap' }}>
                       {(t.subject_ids||[]).slice(0,4).map(sid => {
                         const subj = subjects.find(s=>s.id===sid)
                         return subj ? (
-                          <span key={sid} style={{
-                            fontSize:10, fontWeight:700, padding:'2px 7px',
-                            borderRadius:10, background: `${subj.color_hex||'#6366f1'}22`,
-                            color: subj.color_hex||'#6366f1'
-                          }}>{subj.name}</span>
+                          <span key={sid} className="teacher-subject-pill"
+                            style={{ background: `${subj.color_hex||'#6366f1'}18`, color: subj.color_hex||'#6366f1' }}>
+                            <span className="teacher-subject-dot" style={{ background: subj.color_hex||'#6366f1' }}/>
+                            {subj.name}
+                          </span>
                         ) : null
                       })}
                       {(t.subject_ids||[]).length > 4 && (
-                        <span style={{ fontSize:10, color:'var(--muted)' }}>
+                        <span style={{ fontSize:10.5, color:'var(--muted)', fontWeight:600, alignSelf:'center' }}>
                           +{(t.subject_ids||[]).length - 4} more
                         </span>
                       )}
@@ -258,9 +255,7 @@ export default function Teachers() {
                       onClick={e=>openEdit(t,e)} title="Edit teacher">
                       <Pencil size={13}/>
                     </button>
-                    <button className="btn btn-sm"
-                      style={{ color:'var(--red,#ef4444)', background:'rgba(239,68,68,.08)',
-                               border:'1px solid rgba(239,68,68,.2)' }}
+                    <button className="btn btn-sm delete-btn"
                       onClick={e=>deleteTeacher(t.id,e)} title="Delete">
                       <Trash2 size={13}/>
                     </button>
@@ -427,9 +422,9 @@ export default function Teachers() {
                 </div>
 
                 {selectedSubs.length > 0 && (
-                  <div style={{ padding:'10px 12px', background:'rgba(16,185,129,.06)',
-                    border:'1px solid rgba(16,185,129,.2)', borderRadius:8,
-                    fontSize:12, color:'#10b981' }}>
+                  <div style={{ padding:'10px 12px', background:'rgba(74,222,128,.08)',
+                    border:'1px solid rgba(74,222,128,.25)', borderRadius:10,
+                    fontSize:12, color:'#16a34a' }}>
                     ✓ {selectedSubs.length} subject{selectedSubs.length!==1?'s':''} selected
                   </div>
                 )}

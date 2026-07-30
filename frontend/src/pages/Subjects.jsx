@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { subjectsAPI } from '../api/client'
 import toast from 'react-hot-toast'
-import { Plus, Pencil, Trash2, Upload, Download } from 'lucide-react'
+import { Plus, Pencil, Trash2, Upload, Download, BookOpen, Layers } from 'lucide-react'
 
-const empty = { name: '', grade_level: '', weekly_periods: 4, allows_double_period: false, is_static_eligible: false, color_hex: '#1565c0' }
-const COLORS = ['#1565c0','#6a1b9a','#2e7d32','#bf360c','#0277bd','#e65100','#558b2f','#004d40','#4a148c','#880e4f']
+const empty = { name: '', grade_level: '', weekly_periods: 4, allows_double_period: false, is_static_eligible: false, color_hex: '#38bdf8' }
+const COLORS = ['#38bdf8','#7c3aed','#4ade80','#f97316','#0ea5e9','#e65100','#16a34a','#0f766e','#a855f7','#db2777']
 
 export default function Subjects() {
   const [subjects, setSubjects] = useState([])
@@ -22,7 +23,7 @@ export default function Subjects() {
   const openEdit = (s) => {
     setForm({ name: s.name, grade_level: s.grade_level, weekly_periods: s.weekly_periods,
               allows_double_period: s.allows_double_period, is_static_eligible: s.is_static_eligible,
-              color_hex: s.color_hex || '#1565c0' })
+              color_hex: s.color_hex || '#38bdf8' })
     setEditId(s.id); setModal(true)
   }
 
@@ -70,7 +71,9 @@ export default function Subjects() {
   return (
     <>
       <div className="topbar">
-        <h2>Subjects</h2>
+        <h2 style={{ display:'flex', alignItems:'center', gap:9 }}>
+          <span className="subj-page-icon"><BookOpen size={16}/></span> Subjects
+        </h2>
         <div className="topbar-actions">
           <button className="btn btn-secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
             <Upload size={15} /> {importing ? 'Importing…' : 'Import CSV/Excel'}
@@ -84,99 +87,116 @@ export default function Subjects() {
         </div>
       </div>
       <div className="page">
-        {grades.map(grade => (
-          <div key={grade} className="card" style={{ marginBottom: 20 }}>
-            <div className="card-header">
-              <div className="card-title">Grade {grade}</div>
-              <span className="badge badge-blue">{subjects.filter(s => s.grade_level === grade).length} subjects</span>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Subject</th><th>Periods/Week</th><th>Double Period</th><th>Static Lock</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {subjects.filter(s => s.grade_level === grade).map(s => (
-                    <tr key={s.id}>
-                      <td>
-                        <div className="flex-row">
-                          <div style={{ width: 12, height: 12, borderRadius: '50%', background: s.color_hex || '#999', flexShrink: 0 }} />
-                          <strong>{s.name}</strong>
-                        </div>
-                      </td>
-                      <td><span className="badge badge-blue">{s.weekly_periods}×</span></td>
-                      <td>{s.allows_double_period ? '✅' : '—'}</td>
-                      <td>{s.is_static_eligible ? '🔒 Eligible' : '—'}</td>
-                      <td>
-                        <div className="flex-row">
-                          <button className="btn btn-ghost btn-sm" onClick={() => openEdit(s)}><Pencil size={13} /></button>
-                          <button className="btn btn-danger btn-sm" onClick={() => del(s.id)}><Trash2 size={13} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ))}
+        <AnimatePresence>
+          {grades.map((grade, gi) => (
+            <motion.div key={grade} className="card subj-grade-card" style={{ marginBottom: 20 }}
+              initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }}
+              transition={{ delay: gi * .05 }}>
+              <div className="card-header">
+                <div className="card-title" style={{ display:'flex', alignItems:'center', gap:9 }}>
+                  <span className="subj-grade-icon"><Layers size={14}/></span>
+                  Grade {grade}
+                </div>
+                <span className="badge badge-blue">{subjects.filter(s => s.grade_level === grade).length} subjects</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Subject</th><th>Periods/Week</th><th>Double Period</th><th>Static Lock</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {subjects.filter(s => s.grade_level === grade).map(s => (
+                      <tr key={s.id}>
+                        <td>
+                          <div className="flex-row">
+                            <span className="subj-color-dot" style={{ background: s.color_hex || '#999' }} />
+                            <strong>{s.name}</strong>
+                          </div>
+                        </td>
+                        <td><span className="badge badge-blue">{s.weekly_periods}×</span></td>
+                        <td>{s.allows_double_period ? <span className="badge badge-green">✓ Yes</span> : <span className="subj-dash">—</span>}</td>
+                        <td>{s.is_static_eligible ? <span className="badge badge-violet">🔒 Eligible</span> : <span className="subj-dash">—</span>}</td>
+                        <td>
+                          <div className="flex-row">
+                            <button className="btn btn-ghost btn-sm subj-edit-btn" onClick={() => openEdit(s)}><Pencil size={13} /></button>
+                            <button className="btn btn-sm delete-btn" onClick={() => del(s.id)}><Trash2 size={13} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
         {subjects.length === 0 && (
-          <div className="empty-state">No subjects yet. Add subjects to begin scheduling.</div>
+          <div className="empty-state">
+            <div className="teacher-empty-icon-wrap" style={{ margin:'0 auto 14px' }}>
+              <BookOpen size={26} color="var(--blue-400)"/>
+            </div>
+            No subjects yet. Add subjects to begin scheduling.
+          </div>
         )}
       </div>
 
-      {modal && (
-        <div className="modal-overlay" onClick={() => setModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editId ? 'Edit Subject' : 'Add Subject'}</div>
-            <div className="grid-2">
-              <div className="form-group">
-                <label className="form-label">Subject Name *</label>
-                <input className="form-input" value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+      <AnimatePresence>
+        {modal && (
+          <motion.div className="modal-overlay" onClick={() => setModal(false)}
+            initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}>
+            <motion.div className="modal" onClick={e => e.stopPropagation()}
+              initial={{ opacity:0, y:16, scale:.97 }} animate={{ opacity:1, y:0, scale:1 }}
+              exit={{ opacity:0, y:10, scale:.97 }} transition={{ duration:.2 }}>
+              <div className="modal-title">{editId ? 'Edit Subject' : 'Add Subject'}</div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Subject Name *</label>
+                  <input className="form-input" value={form.name}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Grade Level *</label>
+                  <input className="form-input" value={form.grade_level} placeholder="7, 8, Form3…"
+                    onChange={e => setForm(f => ({ ...f, grade_level: e.target.value }))} />
+                </div>
               </div>
               <div className="form-group">
-                <label className="form-label">Grade Level *</label>
-                <input className="form-input" value={form.grade_level} placeholder="7, 8, Form3…"
-                  onChange={e => setForm(f => ({ ...f, grade_level: e.target.value }))} />
+                <label className="form-label">Weekly Periods</label>
+                <input className="form-input" type="number" min={1} max={10} value={form.weekly_periods}
+                  onChange={e => setForm(f => ({ ...f, weekly_periods: +e.target.value }))} />
               </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Weekly Periods</label>
-              <input className="form-input" type="number" min={1} max={10} value={form.weekly_periods}
-                onChange={e => setForm(f => ({ ...f, weekly_periods: +e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Color</label>
-              <div className="flex-row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                {COLORS.map(c => (
-                  <div key={c} onClick={() => setForm(f => ({ ...f, color_hex: c }))}
-                    style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer',
-                      border: form.color_hex === c ? '3px solid var(--text)' : '2px solid transparent' }} />
-                ))}
+              <div className="form-group">
+                <label className="form-label">Color</label>
+                <div className="flex-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                  {COLORS.map(c => (
+                    <div key={c} onClick={() => setForm(f => ({ ...f, color_hex: c }))}
+                      className={`color-swatch${form.color_hex === c ? ' selected' : ''}`}
+                      style={{ background: c }} />
+                  ))}
+                </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
-              <label style={{ display: 'flex', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.allows_double_period}
-                  onChange={e => setForm(f => ({ ...f, allows_double_period: e.target.checked }))} />
-                Allows double period
-              </label>
-              <label style={{ display: 'flex', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.is_static_eligible}
-                  onChange={e => setForm(f => ({ ...f, is_static_eligible: e.target.checked }))} />
-                Static lock eligible
-              </label>
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving || !form.name || !form.grade_level}>
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+                <label style={{ display: 'flex', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.allows_double_period}
+                    onChange={e => setForm(f => ({ ...f, allows_double_period: e.target.checked }))} />
+                  Allows double period
+                </label>
+                <label style={{ display: 'flex', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.is_static_eligible}
+                    onChange={e => setForm(f => ({ ...f, is_static_eligible: e.target.checked }))} />
+                  Static lock eligible
+                </label>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-ghost" onClick={() => setModal(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={save} disabled={saving || !form.name || !form.grade_level}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
