@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  classesAPI, subjectsAPI, teachersAPI, allocationsAPI
+  classesAPI, subjectsAPI, teachersAPI, allocationsAPI, curriculumAPI
 } from '../api/client'
 import toast from 'react-hot-toast'
 import {
@@ -45,6 +45,7 @@ export default function Classes() {
   const [classes,   setClasses]   = useState([])
   const [subjects,  setSubjects]  = useState([])
   const [teachers,  setTeachers]  = useState([])
+  const [systems,   setSystems]   = useState([])   // curricula for the class-level picker
   const [allocs,    setAllocs]    = useState({})   // {classId: allocations[]}
   const [loading,   setLoading]   = useState(true)
 
@@ -56,7 +57,8 @@ export default function Classes() {
 
   // Step 1 — class details
   const [classForm, setClassForm] = useState({
-    name:'', grade_level:'', stream:'', capacity:40, max_subjects_per_day:8
+    name:'', grade_level:'', stream:'', capacity:40, max_subjects_per_day:8,
+    education_system_id: ''
   })
 
   // Step 2 — subjects
@@ -108,6 +110,9 @@ export default function Classes() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    curriculumAPI.list().then(r => setSystems(r.data)).catch(() => {})
+  }, [])
 
   // ── Bulk import — CSV or .xlsx, same fields as the wizard's Step 1 ────────
   const handleImportFile = async (e) => {
@@ -135,7 +140,7 @@ export default function Classes() {
   // ── Wizard helpers ────────────────────────────────────────────────────────
   const resetWizard = () => {
     setStep(1); setEditingId(null)
-    setClassForm({ name:'', grade_level:'', stream:'', capacity:40, max_subjects_per_day:8 })
+    setClassForm({ name:'', grade_level:'', stream:'', capacity:40, max_subjects_per_day:8, education_system_id:'' })
     setSelectedSubjects([]); setTeacherMap({})
     setSaveResult(null); setSubSearch('')
     setNewSubjectName(''); setNewSubjectCode('')
@@ -150,7 +155,8 @@ export default function Classes() {
     setClassForm({
       name: cls.name, grade_level: cls.grade_level,
       stream: cls.stream||'', capacity: cls.capacity||40,
-      max_subjects_per_day: cls.max_subjects_per_day||8
+      max_subjects_per_day: cls.max_subjects_per_day||8,
+      education_system_id: cls.education_system_id||''
     })
     const clsAllocs = allocs[cls.id] || []
     setSelectedSubjects(clsAllocs.map(a => a.subject_id))
@@ -359,6 +365,18 @@ export default function Classes() {
                         <input className="wiz-input" type="number" min={1} max={12}
                           value={classForm.max_subjects_per_day}
                           onChange={e=>setClassForm(f=>({...f,max_subjects_per_day:+e.target.value}))} />
+                      </div>
+                      <div className="wiz-field">
+                        <label className="wiz-label">Curriculum</label>
+                        <select className="wiz-select" value={classForm.education_system_id}
+                          onChange={e=>setClassForm(f=>({...f,education_system_id:e.target.value}))}>
+                          <option value="">— No specific curriculum —</option>
+                          {systems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                        <span style={{fontSize:10.5,color:'var(--muted)',marginTop:3,display:'block'}}>
+                          Timetable generation only matches this class with subjects from the same curriculum
+                          (or subjects with no curriculum tag). Leave blank to match by grade level only.
+                        </span>
                       </div>
                     </div>
                     <div className="wizard-footer">

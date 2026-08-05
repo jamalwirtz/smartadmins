@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { examsAPI, subjectsAPI, classesAPI, teachersAPI,
-         exportAPI, templatesAPI, supervisorsAPI, roomsAPI } from '../api/client'
+         exportAPI, templatesAPI, supervisorsAPI, roomsAPI, examLayoutsAPI } from '../api/client'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday']
@@ -78,6 +78,8 @@ export default function Exams() {
   const [editingSlot, setEditingSlot] = useState(null)  // id of the slot currently in edit mode
   const [examTpls,   setExamTpls]   = useState([])
   const [ttTpls,     setTtTpls]     = useState([])
+  const [layouts,        setLayouts]        = useState([])
+  const [activeLayoutId, setActiveLayoutId]  = useState(null)  // null = use session/org default
 
   // UI state
   const [loading,       setLoading]       = useState(true)
@@ -124,15 +126,17 @@ export default function Exams() {
 
   const loadSupport = useCallback(async () => {
     try {
-      const [s, c, p, et, sv, rm] = await Promise.all([
+      const [s, c, p, et, sv, rm, lay] = await Promise.all([
         subjectsAPI.list(), classesAPI.list(),
         examsAPI.allPapers(), templatesAPI.examTemplates(),
         supervisorsAPI.list().catch(() => ({ data:[] })),
         roomsAPI.list().catch(() => ({ data:[] })),
+        examLayoutsAPI.list().catch(() => ({ data:[] })),
       ])
       setSubjects(s.data); setClasses(c.data)
       setPapersData(p.data); setExamTpls(et.data)
       setSupervisors(sv.data); setRooms(rm.data)
+      setLayouts(lay.data)
       setGenForm(f => ({
         ...f,
         subject_ids: s.data.map(x => x.id),
@@ -251,9 +255,6 @@ export default function Exams() {
     } catch (err) { toast.error(err?.response?.data?.detail || 'Cannot delete locked slot') }
   }
 
-  // FIX: this function already existed but was never passed to <ExamSlotCard>,
-  // so the whole "assign supervisor/room" feature was dead — clicking the
-  // pencil icon did nothing because onEditToggle was undefined.
   const handleAssignSlot = async (slotId, updates) => {
     try {
       await examsAPI.updateSlot(slotId, updates)
@@ -281,8 +282,8 @@ export default function Exams() {
     setExporting(format)
     try {
       const r = format === 'pdf'
-        ? await exportAPI.examPdf(active.id)
-        : await exportAPI.examXlsx(active.id)
+        ? await exportAPI.examPdf(active.id, activeLayoutId)
+        : await exportAPI.examXlsx(active.id, activeLayoutId)
       const ext  = format === 'pdf' ? 'pdf' : 'xlsx'
       const name = active.name.replace(/\s+/g, '_').replace(/[/\\]/g, '-')
       triggerDownload(r.data, `exam_${name}.${ext}`)
@@ -683,7 +684,10 @@ export default function Exams() {
           <ExportDropdown
             onPdf={() => handleExport('pdf')}
             onXlsx={() => handleExport('xlsx')}
-            loading={exporting} />
+            loading={exporting}
+            layouts={layouts}
+            activeLayoutId={activeLayoutId}
+            onSelectLayout={setActiveLayoutId} />
           <button className="btn btn-accent btn-sm" onClick={() => setShowGenerate(true)}>
             <Play size={13}/> Generate
           </button>
@@ -892,8 +896,6 @@ function ExamSlotCard({ slot, onLock, onDelete, onAssign, supervisors=[], rooms=
   const [roomVal, setRoomVal] = useState(slot.room || '')
   const [roomId,  setRoomId]  = useState(slot.room_id || '')
 
-  // Keep local edit-form state in sync if the slot data refreshes underneath us
-  // (e.g. after a save elsewhere triggers a reload of the session).
   useEffect(() => {
     setSupId(slot.invigilator_id || '')
     setRoomVal(slot.room || '')
@@ -992,7 +994,7 @@ function ExamSlotCard({ slot, onLock, onDelete, onAssign, supervisors=[], rooms=
   )
 }
 
-function ExportDropdown({ onPdf, onXlsx, loading }) {
+function ExportDropdown({ onPdf, onXlsx, loading, layouts = [], activeLayoutId, onSelectLayout }) {
   const [open, setOpen] = useState(false)
   const ref = useRef()
   useEffect(() => {
@@ -1000,6 +1002,9 @@ function ExportDropdown({ onPdf, onXlsx, loading }) {
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
+
+  const activeLayout = layouts.find(l => l.id === activeLayoutId)
+  const defaultLayout = layouts.find(l => l.is_default)
 
   return (
     <div className="exam-export-wrap" ref={ref}>
@@ -1015,18 +1020,41 @@ function ExportDropdown({ onPdf, onXlsx, loading }) {
             initial={{ opacity:0, y:-6, scale:.97 }}
             animate={{ opacity:1, y:0, scale:1 }}
             exit={{ opacity:0, y:-6, scale:.97 }}>
+
+            {layouts.length > 0 && (
+              <div className="exam-export-layout-section">
+                <div className="exam-export-layout-label">Layout template</div>
+                <button className={`exam-export-layout-opt${!activeLayoutId ? ' active' : ''}`}
+                  onClick={() => onSelectLayout(null)}>
+                  {!activeLayoutId && <Check size={12}/>}
+                  Default {defaultLayout ? `(${defaultLayout.name})` : ''}
+                </button>
+                {layouts.map(l => (
+                  <button key={l.id} className={`exam-export-layout-opt${activeLayoutId===l.id ? ' active' : ''}`}
+                    onClick={() => onSelectLayout(l.id)}>
+                    {activeLayoutId === l.id && <Check size={12}/>}
+                    {l.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <button className="exam-export-item" onClick={() => { onPdf(); setOpen(false) }}>
               <FileText size={14} color="#ef4444"/>
               <div>
                 <div className="exam-export-item-title">Export as PDF</div>
-                <div className="exam-export-item-sub">Printable schedule by day</div>
+                <div className="exam-export-item-sub">
+                  {activeLayout ? `Using "${activeLayout.name}" layout` : 'Printable schedule by day'}
+                </div>
               </div>
             </button>
             <button className="exam-export-item" onClick={() => { onXlsx(); setOpen(false) }}>
               <FileSpreadsheet size={14} color="#22c55e"/>
               <div>
                 <div className="exam-export-item-title">Export as Excel</div>
-                <div className="exam-export-item-sub">Spreadsheet with per-day sheets</div>
+                <div className="exam-export-item-sub">
+                  {activeLayout ? `Using "${activeLayout.name}" layout` : 'Spreadsheet with per-day sheets'}
+                </div>
               </div>
             </button>
           </motion.div>

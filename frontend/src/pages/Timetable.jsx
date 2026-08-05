@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, closestCenter,
   useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
-import { schedulesAPI, exportAPI, schoolAPI } from '../api/client'
+import { schedulesAPI, exportAPI, schoolAPI, timetableLayoutsAPI } from '../api/client'
 import { useDraftWS } from '../hooks/useWebSocket'
 import toast from 'react-hot-toast'
 import {
@@ -50,14 +50,6 @@ function TimetableCell({ slot, onLock, onEditSlot }) {
 
   const stype    = SLOT_TYPES[slot.slot_type] || SLOT_TYPES.lesson
   const isSpecial = slot.slot_type && slot.slot_type !== 'lesson'
-  // FIX: previously the whole cell background was filled with the raw
-  // subject color at ~10% opacity, and the subject-color text sat directly
-  // on top. In dark mode that tint barely differed from the page background
-  // and the (light-mode-tuned) dark saturated subject colors were hard to
-  // read; in light mode the pastel fill plus colored text also read as
-  // "busy"/generic. Now every cell uses the normal theme card surface with
-  // a colored left accent stripe (like the exam-slot cards), which keeps
-  // strong, theme-correct contrast regardless of which subject color is used.
   const accentColor = isSpecial ? stype.color : (slot.subject_color || 'var(--blue-400)')
   const textCol  = isSpecial ? stype.color : (slot.subject_color || 'var(--text)')
 
@@ -71,11 +63,6 @@ function TimetableCell({ slot, onLock, onEditSlot }) {
       transition={{ duration:0.2 }}
       {...(slot.is_locked ? {} : { ...attributes, ...listeners })}>
 
-      {/* FIX: this badge didn't exist before — locked state was only shown
-          via a barely-visible 9px emoji in the corner (opacity .8) that
-          required close inspection to notice. Now it's a persistent, always
-          visible pill so a locked slot reads as "locked" at a glance,
-          instantly, without hovering. */}
       {slot.is_locked && (
         <div className="tt-lock-badge" title="Locked — this slot won't move during reshuffle">
           <Lock size={9}/> Locked
@@ -156,18 +143,15 @@ function TimetableGrid({ slots, classes, onLock, onMove, activeDraftId }) {
     const period = parseInt(newPeriod, 10)
     if (slot.day === newDay && slot.period === period) return
 
-    // Optimistic UI update
     const key = `${slot.day}-${slot.period}`
     const targetKey = `${newDay}-${newPeriod}`
     const targetSlot = slotMap[targetKey]
 
     try {
       if (targetSlot && !targetSlot.is_locked) {
-        // Swap
         await schedulesAPI.swapSlots(slot.id, targetSlot.id)
         toast.success('Slots swapped', { icon: '🔄' })
       } else if (!targetSlot) {
-        // Move
         await schedulesAPI.moveSlot(slot.id, newDay, period)
         toast.success('Slot moved', { icon: '✅' })
       } else {
@@ -258,8 +242,8 @@ function TimetableGrid({ slots, classes, onLock, onMove, activeDraftId }) {
   )
 }
 
-// ── Export dropdown (PDF / CSV / Excel) ───────────────────────────────────────
-function TimetableExportDropdown({ onPdf, onCsv, onXlsx }) {
+// ── Export dropdown (PDF / CSV / Excel) — now with a layout-template picker ───
+function TimetableExportDropdown({ onPdf, onCsv, onXlsx, layouts = [], activeLayoutId, onSelectLayout }) {
   const [open, setOpen] = useState(false)
   const ref = useRef()
   useEffect(() => {
@@ -267,6 +251,9 @@ function TimetableExportDropdown({ onPdf, onCsv, onXlsx }) {
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
+
+  const activeLayout = layouts.find(l => l.id === activeLayoutId)
+  const defaultLayout = layouts.find(l => l.is_default)
 
   return (
     <div className="exam-export-wrap" ref={ref}>
@@ -279,11 +266,32 @@ function TimetableExportDropdown({ onPdf, onCsv, onXlsx }) {
             initial={{ opacity:0, y:-6, scale:.97 }}
             animate={{ opacity:1, y:0, scale:1 }}
             exit={{ opacity:0, y:-6, scale:.97 }}>
+
+            {layouts.length > 0 && (
+              <div className="exam-export-layout-section">
+                <div className="exam-export-layout-label">PDF layout template</div>
+                <button className={`exam-export-layout-opt${!activeLayoutId ? ' active' : ''}`}
+                  onClick={() => onSelectLayout(null)}>
+                  {!activeLayoutId && <Check size={12}/>}
+                  Default {defaultLayout ? `(${defaultLayout.name})` : ''}
+                </button>
+                {layouts.map(l => (
+                  <button key={l.id} className={`exam-export-layout-opt${activeLayoutId===l.id ? ' active' : ''}`}
+                    onClick={() => onSelectLayout(l.id)}>
+                    {activeLayoutId === l.id && <Check size={12}/>}
+                    {l.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <button className="exam-export-item" onClick={() => { onPdf(); setOpen(false) }}>
               <FileText size={14} color="#ef4444"/>
               <div>
                 <div className="exam-export-item-title">Export as PDF</div>
-                <div className="exam-export-item-sub">One class per page, print-ready</div>
+                <div className="exam-export-item-sub">
+                  {activeLayout ? `Using "${activeLayout.name}" layout` : 'One class per page, print-ready'}
+                </div>
               </div>
             </button>
             <button className="exam-export-item" onClick={() => { onCsv(); setOpen(false) }}>
@@ -358,6 +366,8 @@ export default function Timetable() {
   const [schoolCfg,     setSchoolCfg]     = useState(null)
   const [savingPdf,     setSavingPdf]     = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [ttLayouts,      setTtLayouts]      = useState([])
+  const [activeLayoutId, setActiveLayoutId] = useState(null)
 
   const loadDrafts = useCallback(() =>
     schedulesAPI.drafts().then(r => {
@@ -383,6 +393,7 @@ export default function Timetable() {
   useEffect(() => { loadDrafts() }, [loadDrafts])
   useEffect(() => {
     schoolAPI.getSettings().then(r => setSchoolCfg(r.data)).catch(() => {})
+    timetableLayoutsAPI.list().then(r => setTtLayouts(r.data)).catch(() => {})
   }, [])
   useEffect(() => { if (selectedDraftId) loadDetail(selectedDraftId) }, [selectedDraftId, loadDetail])
 
@@ -438,11 +449,6 @@ export default function Timetable() {
     loadDrafts()
   }
 
-  // FIX: this used to only call the API and wait for the WebSocket
-  // broadcast to come back before the padlock badge appeared — on any
-  // network delay (or if the WS connection dropped), the lock state didn't
-  // visibly change when clicked. Now the UI updates immediately (optimistic
-  // update), and only reverts if the server actually rejects the change.
   const toggleLock = async (slot) => {
     const nextLocked = !slot.is_locked
     setDraftDetail(prev => prev ? {
@@ -484,7 +490,7 @@ export default function Timetable() {
   const downloadPdf = async () => {
     if (!selectedDraftId) return
     try {
-      const r = await exportAPI.draftPdf(selectedDraftId)
+      const r = await exportAPI.draftPdf(selectedDraftId, activeLayoutId)
       const url = URL.createObjectURL(new Blob([r.data], { type:'application/pdf' }))
       const a = document.createElement('a'); a.href = url; a.download = `timetable_${draftDetail?.name || 'draft'}.pdf`; a.click()
       URL.revokeObjectURL(url)
@@ -551,7 +557,8 @@ export default function Timetable() {
             <button className="btn btn-ghost btn-sm" onClick={validate} disabled={validating}>
               <ShieldCheck size={13} /> Validate
             </button>
-            <TimetableExportDropdown onPdf={downloadPdf} onCsv={downloadCsv} onXlsx={downloadXlsx} />
+            <TimetableExportDropdown onPdf={downloadPdf} onCsv={downloadCsv} onXlsx={downloadXlsx}
+              layouts={ttLayouts} activeLayoutId={activeLayoutId} onSelectLayout={setActiveLayoutId} />
             <button className="btn btn-ghost btn-sm" onClick={() => setShowPdfPanel(p => !p)}
               title="PDF & export settings" style={{padding:'5px 8px'}}>
               <Palette size={13} />
