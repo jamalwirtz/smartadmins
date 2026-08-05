@@ -9,9 +9,24 @@ from security import get_current_user, require_admin
 router = APIRouter()
 
 
+def _fmt(s: Subject) -> dict:
+    return {
+        "id": s.id,
+        "name": s.name,
+        "subject_code": s.subject_code,
+        "grade_level": s.grade_level,
+        "weekly_periods": s.weekly_periods,
+        "allows_double_period": s.allows_double_period,
+        "is_static_eligible": s.is_static_eligible,
+        "color_hex": s.color_hex,
+        "education_system_id": s.education_system_id,
+    }
+
+
 @router.get("")
 def list_subjects(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return db.query(Subject).order_by(Subject.grade_level, Subject.name).all()
+    rows = db.query(Subject).order_by(Subject.grade_level, Subject.name).all()
+    return [_fmt(s) for s in rows]
 
 
 @router.post("", status_code=201)
@@ -20,7 +35,7 @@ def create_subject(req: SubjectCreate, db: Session = Depends(get_db), _=Depends(
     db.add(s)
     db.commit()
     db.refresh(s)
-    return {"id": s.id, "name": s.name, "message": "Subject created"}
+    return {"id": s.id, "name": s.name, "subject_code": s.subject_code, "message": "Subject created"}
 
 
 @router.get("/{subject_id}")
@@ -28,7 +43,7 @@ def get_subject(subject_id: str, db: Session = Depends(get_db), _=Depends(get_cu
     s = db.get(Subject, subject_id)
     if not s:
         raise HTTPException(404, "Subject not found")
-    return s
+    return _fmt(s)
 
 
 @router.put("/{subject_id}")

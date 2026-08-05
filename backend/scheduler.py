@@ -235,7 +235,23 @@ class SchedulingEngine:
         new_slots: List[TimetableSlot] = []
 
         for cls in classes:
-            grade_subjects = [s for s in subjects if s.grade_level == cls.grade_level]
+            # FIX: previously matched purely on grade_level, so a class
+            # tagged with one curriculum (e.g. CBC) could get scheduled with
+            # subjects imported from a different curriculum's preset that
+            # happens to use the same grade_level label. Now: if the class
+            # has a curriculum set, only match subjects tagged with that same
+            # curriculum OR subjects with no curriculum tag at all (so
+            # manually-added, curriculum-agnostic subjects still work).
+            # Classes with no curriculum set keep the old grade_level-only
+            # behavior for full backward compatibility.
+            if cls.education_system_id:
+                grade_subjects = [
+                    s for s in subjects
+                    if s.grade_level == cls.grade_level
+                    and (s.education_system_id == cls.education_system_id or not s.education_system_id)
+                ]
+            else:
+                grade_subjects = [s for s in subjects if s.grade_level == cls.grade_level]
 
             # Build the list of (subject, candidate_teachers) to place
             assignments: List[Tuple[Subject, List[Teacher]]] = []

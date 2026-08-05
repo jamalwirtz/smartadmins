@@ -68,11 +68,19 @@ class Subject(Base):
     __tablename__ = "subjects"
     id                  = Column(String(36), primary_key=True, default=_uuid)
     name                = Column(String(120), nullable=False)
+    # FIX: was accepted by the frontend (Classes.jsx's inline "create subject"
+    # step, curriculum-preset import) but silently dropped — SubjectCreate/
+    # SubjectUpdate had no matching field, so Pydantic ignored it and every
+    # subject code entered anywhere in the app was thrown away. Now persisted.
+    subject_code        = Column(String(30),  nullable=True)   # e.g. "0580" (CAIE), "MATH-AA-HL" (IB)
     grade_level         = Column(String(20),  nullable=False)
     weekly_periods      = Column(Integer, default=4)
     allows_double_period= Column(Boolean, default=False)
     is_static_eligible  = Column(Boolean, default=False)
     color_hex           = Column(String(7),   nullable=True)
+    # Which curriculum preset (if any) this subject was imported from —
+    # lets the UI show "from CAIE" and avoid duplicate imports.
+    education_system_id = Column(String(36), ForeignKey('education_systems.id', ondelete='SET NULL'), nullable=True)
     created_at          = Column(DateTime(timezone=True), default=_now)
 
     teacher_assignments = relationship("TeacherSubject", back_populates="subject")
@@ -109,10 +117,15 @@ class TimetableDraft(Base):
     name       = Column(String(80),  nullable=False)
     seed       = Column(Integer, default=0)
     status     = Column(String(20),  default="draft")   # draft | active | archived
+    # Which TimetableLayoutTemplate to use when exporting this draft — falls
+    # back to the org-wide default template if left unset (same pattern as
+    # ExamSession.layout_template_id).
+    layout_template_id = Column(String(36), ForeignKey("timetable_layout_templates.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
-    slots = relationship("TimetableSlot", back_populates="draft", cascade="all, delete-orphan")
+    slots           = relationship("TimetableSlot", back_populates="draft", cascade="all, delete-orphan")
+    layout_template = relationship("TimetableLayoutTemplate")
 
 
 class TimetableSlot(Base):
@@ -183,11 +196,6 @@ class ExamSlot(Base):
     class_id         = Column(String(36), ForeignKey("class_sections.id", ondelete="CASCADE"), nullable=False)
     day              = Column(String(12), nullable=False)
     period           = Column(Integer, nullable=False)
-    # FIX: this used to have ForeignKey("teachers.id") while Supervisor.exam_slots
-    # tried to join through this same column expecting it to reference
-    # supervisors.id — SQLAlchemy couldn't resolve that join, and it crashed
-    # ALL mapper configuration on startup (this is what produced
-    # db_connected:false regardless of which real database was configured).
     invigilator_id   = Column(String(36), ForeignKey("supervisors.id", ondelete="SET NULL"), nullable=True)
     room             = Column(String(80), nullable=True)  # e.g., "Science Lab", "Hall A"
     room_id          = Column(String(36), ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True)
@@ -197,9 +205,6 @@ class ExamSlot(Base):
     exam_session = relationship("ExamSession", back_populates="slots")
     paper        = relationship("ExamPaper", back_populates="exam_slots")
     class_section= relationship("ClassSection")
-    # FIX: now points at Supervisor (matching the corrected FK above) instead
-    # of Teacher, using a clean back_populates pair with Supervisor.exam_slots
-    # below instead of the old foreign_keys=/backref=/overlaps= workaround.
     invigilator  = relationship("Supervisor", back_populates="exam_slots")
     room_ref     = relationship("Room", foreign_keys=[room_id])
 
@@ -216,10 +221,14 @@ class ExamSession(Base):
     start_date  = Column(String(10), nullable=False)  # "2024-06-01"
     end_date    = Column(String(10), nullable=False)
     status      = Column(String(20), default="draft")  # draft | published | completed
+    # Which ExamLayoutTemplate to use when exporting this session — falls
+    # back to the org-wide default template if left unset.
+    layout_template_id = Column(String(36), ForeignKey("exam_layout_templates.id", ondelete="SET NULL"), nullable=True)
     created_at  = Column(DateTime(timezone=True), default=_now)
     updated_at  = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
-    slots = relationship("ExamSlot", back_populates="exam_session", cascade="all, delete-orphan")
+    slots           = relationship("ExamSlot", back_populates="exam_session", cascade="all, delete-orphan")
+    layout_template = relationship("ExamLayoutTemplate")
 
 
 class SchoolSettings(Base):
@@ -238,6 +247,10 @@ class SchoolSettings(Base):
     school_phone  = Column(String(40),  nullable=True)
     school_address= Column(String(300), nullable=True)
     country_code  = Column(String(4),   default="ZA")
+    # Default curriculum system for this school — drives which subject-code
+    # presets are suggested during onboarding and on the Subjects page.
+    education_system_id = Column(String(36), ForeignKey('education_systems.id', ondelete='SET NULL'), nullable=True)
+    onboarding_completed = Column(Boolean, default=False)
     badge_data    = Column(Text,        nullable=True)   # base64-encoded logo image
     badge_mime    = Column(String(30),  nullable=True)   # "image/png" | "image/jpeg"
     badge_position= Column(String(20),  default="top-left")  # top-left|top-center|top-right
@@ -344,6 +357,66 @@ class Supervisor(Base):
     is_active    = Column(Boolean,     default=True)
     created_at   = Column(DateTime(timezone=True), default=_now)
 
-    # FIX: simple back_populates pair with ExamSlot.invigilator now that the
-    # foreign key on ExamSlot.invigilator_id correctly targets supervisors.id.
     exam_slots = relationship("ExamSlot", back_populates="invigilator")
+
+
+# ── Exam Layout Template (NEW) ─────────────────────────────────────────────────
+class ExamLayoutTemplate(Base):
+    """
+    A reusable, editable exam-timetable layout: which columns/fields appear,
+    how slots are grouped, page orientation, and the footer/warning text
+    stamped on every exported PDF and Excel workbook.
+
+    Multiple templates can coexist (e.g. "Full Detail", "Student Notice Board
+    Copy", "Invigilator Roster") and each ExamSession picks one — or falls
+    back to whichever template has is_default=True.
+    """
+    __tablename__ = "exam_layout_templates"
+
+    id           = Column(String(36), primary_key=True, default=_uuid)
+    name         = Column(String(80),  nullable=False)
+    is_default   = Column(Boolean,     default=False)
+
+    # Structural variant
+    group_by     = Column(String(10),  default="day")     # day | class
+    orientation  = Column(String(12),  default="landscape")  # landscape | portrait
+
+    # Field placement — which columns are included in the export table
+    show_duration     = Column(Boolean, default=True)
+    show_invigilator  = Column(Boolean, default=True)
+    show_room         = Column(Boolean, default=True)
+    show_notes        = Column(Boolean, default=False)
+    show_practical_tag= Column(Boolean, default=True)
+
+    # Footer & warnings
+    footer_text  = Column(String(500), nullable=True)   # e.g. "Generated by SSTG — subject to change"
+    warning_text = Column(String(500), nullable=True)   # e.g. "No electronic devices permitted in the exam hall"
+
+    created_at = Column(DateTime(timezone=True), default=_now)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+# ── Timetable Layout Template (NEW) ────────────────────────────────────────────
+class TimetableLayoutTemplate(Base):
+    """
+    Twin of ExamLayoutTemplate for regular class timetables — lets an admin
+    define multiple export layouts (orientation, footer text, warning
+    banners) for the weekly timetable PDF/Excel/CSV exports, mirroring the
+    exam schedule editor so both "schedules" (exams and timetables) share
+    the same editing model.
+    """
+    __tablename__ = "timetable_layout_templates"
+
+    id          = Column(String(36), primary_key=True, default=_uuid)
+    name        = Column(String(80),  nullable=False)
+    is_default  = Column(Boolean,     default=False)
+    orientation = Column(String(12),  default="landscape")  # landscape | portrait
+
+    show_locked_badge = Column(Boolean, default=True)   # visually flag locked slots on export
+    show_room         = Column(Boolean, default=False)  # only relevant if rooms are used for lessons
+
+    footer_text  = Column(String(500), nullable=True)
+    warning_text = Column(String(500), nullable=True)   # e.g. "Draft — not yet published to staff"
+
+    created_at = Column(DateTime(timezone=True), default=_now)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)

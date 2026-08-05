@@ -337,14 +337,11 @@ def _thin_border():
 
 class ExcelExporter(PDFExporter):
     """
-    FIX: previously `class ExcelExporter:` stood alone with no relationship
-    to PDFExporter, so exam_pdf() below had no access to _header() /
-    _school_info() and had to hand-roll its own header using the hardcoded
-    cfg.SCHOOL_NAME default — it could never show the uploaded badge/logo
-    or a school name edited in Settings. Inheriting from PDFExporter gives
-    it access to the same header/theme helpers the timetable PDF already
-    uses correctly, while ExcelExporter's own _check() below still
-    overrides PDFExporter's (openpyxl vs reportlab availability).
+    Inherits from PDFExporter for shared header/theme helpers (_header,
+    _theme, _school_info, etc.) which both the timetable and exam exports
+    (PDF and Excel, default and layout-aware) rely on. Its own _check()
+    below overrides PDFExporter's — openpyxl availability instead of
+    reportlab.
     """
 
     def _check(self):
@@ -408,8 +405,6 @@ class ExcelExporter(PDFExporter):
         classes  = db.query(ClassSection).order_by(ClassSection.grade_level, ClassSection.name).all()
 
         # ── Summary sheet ─────────────────────────────────────────────────────
-        # FIX: was hardcoded to cfg.SCHOOL_NAME (the static default), so
-        # editing the school name in Settings never showed up here.
         school_name = self._school_info(db)["name"]
         ws_sum = wb.create_sheet("Summary")
         ws_sum["A1"] = school_name
@@ -522,11 +517,6 @@ class ExcelExporter(PDFExporter):
         story = []
         styles = getSampleStyleSheet()
 
-        # FIX: this used to build its own header from scratch with
-        # cfg.SCHOOL_NAME (a static default) and never touched the database
-        # at all, so the uploaded badge/logo — and any school name edited
-        # in Settings — never appeared on exam PDFs. Reusing _header() (now
-        # available via inheritance from PDFExporter) fixes both.
         self._header(story, f"Exam Timetable — {session.name}", db)
 
         sub_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=9,
@@ -594,8 +584,6 @@ class ExcelExporter(PDFExporter):
             story.append(tbl)
             story.append(Spacer(1, 0.4*cm))
 
-            # FIX: give each exam day its own page, same reasoning as the
-            # timetable PDF above — otherwise days run together on one sheet.
             if di < len(days_with_slots) - 1:
                 story.append(PageBreak())
 
@@ -624,10 +612,6 @@ class ExcelExporter(PDFExporter):
 
         day_order = ["Monday","Tuesday","Wednesday","Thursday","Friday"]
 
-        # FIX: inc_sup / inc_room were referenced below but never defined
-        # anywhere — this raised NameError on every single exam Excel export.
-        # Pull the toggle from School Settings (same source the PDF exporter
-        # uses via _exam_cols), defaulting to True/True if unset.
         try:
             from models import SchoolSettings
             _ss = db.query(SchoolSettings).first()
@@ -637,7 +621,6 @@ class ExcelExporter(PDFExporter):
             inc_sup, inc_room = True, True
 
         # ── Overview sheet ────────────────────────────────────────────────────
-        # FIX: was hardcoded to cfg.SCHOOL_NAME (the static default).
         school_name = self._school_info(db)["name"]
         ws_ov = wb.create_sheet("Overview")
         ws_ov["A1"] = school_name
@@ -645,9 +628,6 @@ class ExcelExporter(PDFExporter):
         ws_ov["A2"] = f"Exam Session: {session.name}   |   {session.start_date} → {session.end_date}"
         ws_ov["A2"].font = Font(italic=True, size=11, color="555555")
 
-        # FIX: headers now match the row data exactly — previously the header
-        # row always listed "Invigilator"/"Room" columns even when inc_sup/
-        # inc_room were False, so data columns didn't line up under headers.
         ov_headers = ["Day","Period","Subject","Paper","Class","Duration (min)"]
         if inc_sup:  ov_headers.append("Invigilator")
         if inc_room: ov_headers.append("Room")
@@ -730,4 +710,306 @@ class ExcelExporter(PDFExporter):
 
         buf = BytesIO()
         wb.save(buf)
+        return buf.getvalue()
+
+    # ── Layout-aware exam export (multi-template editor) ───────────────────
+
+    def exam_pdf_layout(self, session, db: Session, layout) -> bytes:
+        """
+        Same data as exam_pdf(), but every structural choice — grouping,
+        which columns appear, orientation, footer text, warning banner —
+        comes from an ExamLayoutTemplate instead of being hardcoded.
+        """
+        if not RL:
+            from fastapi import HTTPException
+            raise HTTPException(503, "reportlab not installed")
+        from collections import defaultdict as dd
+        from models import ExamSlot
+
+        page = landscape(A4) if layout.orientation == "landscape" else A4
+        buf = BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=page,
+                                 leftMargin=1*cm, rightMargin=1*cm,
+                                 topMargin=1.5*cm, bottomMargin=1.5*cm)
+        story = []
+        styles = getSampleStyleSheet()
+        self._header(story, f"Exam Timetable — {session.name}  ({layout.name})", db)
+
+        sub_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=9,
+                                    textColor=colors.grey, spaceAfter=8)
+        story.append(Paragraph(f"{session.start_date} to {session.end_date}", sub_style))
+
+        if layout.warning_text:
+            warn_style = ParagraphStyle(
+                "W", parent=styles["Normal"], fontSize=9.5,
+                textColor=colors.HexColor("#92400e"),
+                backColor=colors.HexColor("#fef3c7"),
+                borderPadding=6, spaceAfter=10, fontName="Helvetica-Bold",
+            )
+            story.append(Paragraph(f"\u26a0 {layout.warning_text}", warn_style))
+
+        story.append(Spacer(1, 0.15*cm))
+
+        slots = (
+            db.query(ExamSlot)
+            .filter(ExamSlot.exam_session_id == session.id)
+            .order_by(ExamSlot.day, ExamSlot.period)
+            .all()
+        )
+        if not slots:
+            story.append(Paragraph("No exam slots scheduled yet.", styles["Normal"]))
+            doc.build(story)
+            return buf.getvalue()
+
+        if layout.group_by == "class":
+            groups = dd(list)
+            for sl in slots:
+                groups[sl.class_section.name].append(sl)
+            group_keys = sorted(groups.keys())
+            group_col_label = "Day / Period"
+        else:
+            day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+            groups = dd(list)
+            for sl in slots:
+                groups[sl.day].append(sl)
+            group_keys = [d for d in day_order if groups.get(d)]
+            group_col_label = "Period"
+
+        for gi, key in enumerate(group_keys):
+            group_slots = sorted(
+                groups[key],
+                key=(lambda s: (s.day, s.period)) if layout.group_by == "class" else (lambda s: s.period),
+            )
+
+            story.append(Paragraph(key, ParagraphStyle(
+                "D", parent=styles["Heading2"], textColor=colors.HexColor("#1E3A5F"),
+                spaceAfter=4, spaceBefore=10,
+            )))
+
+            header = [group_col_label, "Subject", "Paper"]
+            if layout.show_duration: header.append("Duration")
+            header.append("Class" if layout.group_by == "day" else "Day")
+            if layout.show_invigilator: header.append("Invigilator")
+            if layout.show_room: header.append("Room")
+            if layout.show_notes: header.append("Notes")
+
+            rows = [header]
+            for sl in group_slots:
+                group_col = f"P{sl.period}" if layout.group_by == "day" else f"{sl.day} \u00b7 P{sl.period}"
+                paper_label = f"Paper {sl.paper.paper_number}"
+                if layout.show_practical_tag and sl.paper.is_practical:
+                    paper_label += "*"
+                row = [group_col, sl.paper.subject.name, paper_label]
+                if layout.show_duration: row.append(f"{sl.paper.duration_minutes} min")
+                row.append(sl.class_section.name if layout.group_by == "day" else sl.day)
+                if layout.show_invigilator: row.append(sl.invigilator.name if sl.invigilator else "\u2014")
+                if layout.show_room: row.append(sl.room or "\u2014")
+                if layout.show_notes: row.append(sl.notes or "")
+                rows.append(row)
+
+            n_cols = len(header)
+            total_w = 24 * cm if layout.orientation == "landscape" else 17 * cm
+            col_w = total_w / n_cols
+            tbl = Table(rows, colWidths=[col_w] * n_cols, repeatRows=1)
+            tbl.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#1E3A5F")),
+                ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+                ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE",      (0, 0), (-1, 0), 8),
+                ("FONTSIZE",      (0, 1), (-1, -1), 8),
+                ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+                ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
+                ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, colors.HexColor("#EFF6FF")]),
+                ("TOPPADDING",    (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(tbl)
+            story.append(Spacer(1, 0.4*cm))
+
+            if gi < len(group_keys) - 1:
+                story.append(PageBreak())
+
+        if layout.show_practical_tag:
+            story.append(Paragraph("* Practical paper", styles["Normal"]))
+
+        if layout.footer_text:
+            story.append(Spacer(1, 0.5*cm))
+            story.append(Paragraph(
+                layout.footer_text,
+                ParagraphStyle("F", parent=styles["Normal"], fontSize=8,
+                                textColor=colors.grey, alignment=1),
+            ))
+
+        doc.build(story)
+        return buf.getvalue()
+
+    def exam_xlsx_layout(self, session, db: Session, layout) -> bytes:
+        """Excel counterpart of exam_pdf_layout() — same layout-driven columns,
+        footer, and warning banner, one flat sheet."""
+        self._check()
+        from models import ExamSlot
+
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+
+        slots = (
+            db.query(ExamSlot)
+            .filter(ExamSlot.exam_session_id == session.id)
+            .order_by(ExamSlot.day, ExamSlot.period)
+            .all()
+        )
+
+        school_name = self._school_info(db)["name"]
+        ws = wb.create_sheet((layout.name or "Exam Schedule")[:28])
+        ws["A1"] = school_name
+        ws["A1"].font = Font(bold=True, size=16, color=_EXAM_H)
+        ws["A2"] = (f"Exam Session: {session.name}   |   Layout: {layout.name}   |   "
+                    f"{session.start_date} \u2192 {session.end_date}")
+        ws["A2"].font = Font(italic=True, size=11, color="555555")
+
+        row_cursor = 4
+        if layout.warning_text:
+            ws.cell(row=row_cursor, column=1, value=f"\u26a0 {layout.warning_text}")
+            ws.cell(row=row_cursor, column=1).font = Font(bold=True, size=10, color="92400E")
+            ws.cell(row=row_cursor, column=1).fill = PatternFill("solid", fgColor="FEF3C7")
+            row_cursor += 2
+
+        headers = ["Day", "Period", "Subject", "Paper"]
+        if layout.show_duration: headers.append("Duration (min)")
+        headers.append("Class")
+        if layout.show_invigilator: headers.append("Invigilator")
+        if layout.show_room: headers.append("Room")
+        if layout.show_notes: headers.append("Notes")
+
+        header_row = row_cursor
+        last_col = get_column_letter(len(headers))
+        ws.merge_cells(f"A1:{last_col}1")
+        ws.merge_cells(f"A2:{last_col}2")
+        for ci, h in enumerate(headers, 1):
+            c = ws.cell(row=header_row, column=ci, value=h)
+            c.font = Font(bold=True, color=_WHITE)
+            c.fill = PatternFill("solid", fgColor=_EXAM_H)
+            c.alignment = Alignment(horizontal="center")
+            c.border = _thin_border()
+
+        data_row = header_row + 1
+        for sl in slots:
+            paper_label = f"Paper {sl.paper.paper_number}"
+            if layout.show_practical_tag and sl.paper.is_practical:
+                paper_label += "*"
+            row = [sl.day, sl.period, sl.paper.subject.name, paper_label]
+            if layout.show_duration: row.append(sl.paper.duration_minutes)
+            row.append(sl.class_section.name)
+            if layout.show_invigilator: row.append(sl.invigilator.name if sl.invigilator else "")
+            if layout.show_room: row.append(sl.room or "")
+            if layout.show_notes: row.append(sl.notes or "")
+            for ci, val in enumerate(row, 1):
+                c = ws.cell(row=data_row, column=ci, value=val)
+                c.alignment = Alignment(horizontal="center")
+                c.border = _thin_border()
+                if data_row % 2 == 0:
+                    c.fill = PatternFill("solid", fgColor=_GREY_L)
+            data_row += 1
+
+        if layout.footer_text:
+            data_row += 1
+            fc = ws.cell(row=data_row, column=1, value=layout.footer_text)
+            fc.font = Font(italic=True, size=9, color="777777")
+
+        widths = [12, 9, 20, 14, 12, 20, 14, 20][:len(headers)]
+        for ci, w in enumerate(widths, 1):
+            ws.column_dimensions[get_column_letter(ci)].width = w
+
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    # ── Layout-aware timetable export (curriculum-aware "complete editor") ──
+
+    def full_draft_pdf_layout(self, draft, db: Session, layout) -> bytes:
+        """
+        Same data as full_draft_pdf(), but orientation, the locked-slot
+        indicator, footer text, and an optional warning banner all come
+        from a TimetableLayoutTemplate instead of being hardcoded — the
+        timetable-side twin of exam_pdf_layout().
+        """
+        if not RL:
+            from fastapi import HTTPException
+            raise HTTPException(503, "reportlab not installed. Run: pip install reportlab")
+
+        page = landscape(A4) if layout.orientation == "landscape" else A4
+        buf   = BytesIO()
+        doc   = SimpleDocTemplate(buf, pagesize=page,
+                                   leftMargin=1*cm, rightMargin=1*cm,
+                                   topMargin=1.5*cm, bottomMargin=1.5*cm)
+        story  = []
+        theme  = self._theme(db)
+        tlabels= self._time_labels(db)
+        self._header(story, f"{draft.name}  ({layout.name})", db)
+
+        styles = getSampleStyleSheet()
+
+        if layout.warning_text:
+            warn_style = ParagraphStyle(
+                "W", parent=styles["Normal"], fontSize=9.5,
+                textColor=colors.HexColor("#92400e"),
+                backColor=colors.HexColor("#fef3c7"),
+                borderPadding=6, spaceAfter=10, fontName="Helvetica-Bold",
+            )
+            story.append(Paragraph(f"\u26a0 {layout.warning_text}", warn_style))
+
+        days    = cfg.school_days_list
+        periods = list(range(1, cfg.PERIODS_PER_DAY + 1))
+        slots   = db.query(TimetableSlot).filter(TimetableSlot.draft_id == draft.id).all()
+        subj_map = {s.id: s for s in db.query(Subject).all()}
+        tchr_map = {t.id: t for t in db.query(Teacher).all()}
+        slot_idx = defaultdict(dict)
+        for s in slots:
+            slot_idx[s.class_id][(s.day, s.period)] = s
+
+        all_classes = db.query(ClassSection).all()
+        for i, cls in enumerate(all_classes):
+            story.append(Paragraph(
+                f"Class {cls.name}  \u00b7  Grade {cls.grade_level}",
+                ParagraphStyle("CH", parent=styles["Heading2"],
+                               textColor=colors.HexColor(theme["title"]),
+                               spaceAfter=4, spaceBefore=12)))
+            header = ["Period / Time"] + days
+            rows = [header]
+            for p in periods:
+                lbl = tlabels.get(p, "")
+                row = [f"P{p}\n{lbl}" if lbl else str(p)]
+                for d in days:
+                    sl = slot_idx[cls.id].get((d, p))
+                    if sl and sl.subject_id:
+                        subj = subj_map.get(sl.subject_id)
+                        tchr = tchr_map.get(sl.teacher_id) if sl.teacher_id else None
+                        subj_name = subj.name if subj else "?"
+                        tchr_first = tchr.name.split()[0] if tchr else ""
+                        lock_tag = " \U0001f512" if (layout.show_locked_badge and sl.is_locked) else ""
+                        row.append(f"{subj_name}{lock_tag}\n{tchr_first}")
+                    else:
+                        row.append("")
+                rows.append(row)
+
+            page_w = 24*cm if layout.orientation == "landscape" else 17*cm
+            cw = [2.2*cm] + [(page_w - 2.2*cm) / max(len(days), 1)] * len(days)
+            tbl = Table(rows, colWidths=cw, repeatRows=1)
+            tbl.setStyle(self._tbl_style(theme))
+            story.append(tbl)
+            story.append(Spacer(1, 0.6*cm))
+
+            if i < len(all_classes) - 1:
+                story.append(PageBreak())
+
+        if layout.footer_text:
+            story.append(Spacer(1, 0.5*cm))
+            story.append(Paragraph(
+                layout.footer_text,
+                ParagraphStyle("F", parent=styles["Normal"], fontSize=8,
+                                textColor=colors.grey, alignment=1),
+            ))
+
+        doc.build(story)
         return buf.getvalue()

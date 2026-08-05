@@ -12,12 +12,15 @@ from config import get_settings
 from database import Base, engine
 import models  # noqa: registers all ORM models
 
-import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings, allocations, education_systems, rooms, supervisors, import_export
+import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings, allocations, education_systems, rooms, supervisors, import_export, exam_layouts, timetable_layouts
 import ws_routes as websockets
 
 settings = get_settings()
 
 # Create all tables on startup (safe to call repeatedly — skips existing tables)
+# NOTE: this is also what creates the new `exam_layout_templates` table for
+# the multi-template exam editor — it's a brand-new table so no ALTER TABLE
+# migration is needed for it, only for new columns on existing tables (below).
 Base.metadata.create_all(bind=engine)
 
 # ── Auto-seed demo data on first boot ────────────────────────────────────────
@@ -154,6 +157,15 @@ def _run_migrations():
         "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS teacher_name_format VARCHAR(20) DEFAULT 'full_name'",
         "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_supervisors BOOLEAN DEFAULT TRUE",
         "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_rooms BOOLEAN DEFAULT TRUE",
+        # ── Curriculum-aware onboarding (NEW) ──────────────────────────────
+        "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS subject_code VARCHAR(30)",
+        "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
+        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE",
+        # ── Multi-template exam editor (NEW) ───────────────────────────────
+        "ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
+        # ── Curriculum-aware timetable editor (NEW) ────────────────────────
+        "ALTER TABLE timetable_drafts ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
     ]
     try:
         from database import db_url
@@ -218,6 +230,8 @@ app.include_router(education_systems.router, prefix="",  tags=["Education System
 app.include_router(rooms.router,             prefix="",  tags=["Rooms"])
 app.include_router(supervisors.router,       prefix="",  tags=["Supervisors"])
 app.include_router(import_export.router,     prefix="",  tags=["Import/Export"])
+app.include_router(exam_layouts.router,      prefix="",  tags=["Exam Layout Templates"])
+app.include_router(timetable_layouts.router, prefix="",  tags=["Timetable Layout Templates"])
 app.include_router(websockets.router, tags=["WebSockets"])
 
 
@@ -280,33 +294,20 @@ _DIST_DIR  = _os.path.join(_THIS_DIR, "..", "frontend", "dist")
 _DIST_DIR  = _os.path.normpath(_DIST_DIR)
 
 # ── Serve React SPA (production) ──────────────────────────────────────────────
-# IMPORTANT: We do NOT use app.mount("/static") because that catches ALL paths
-# including /dashboard, /login etc. and returns 404 instead of index.html.
-# Instead we use a single catch-all route that:
-#   1. Serves exact files from dist/ (JS chunks, CSS, images, favicon)
-#   2. Falls back to index.html for everything else (React Router takes over)
-
 if _os.path.isdir(_DIST_DIR):
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def serve_frontend(full_path: str):
-        # Empty path → serve index.html (root URL)
         if not full_path:
             return FileResponse(_os.path.join(_DIST_DIR, "index.html"))
 
-        # Check for exact file match first (assets/index-xxx.js, favicon.png, logo.png…)
         exact = _os.path.join(_DIST_DIR, full_path)
         if _os.path.isfile(exact):
             return FileResponse(exact)
 
-        # assets/ subfolder (Vite puts hashed JS/CSS here)
-        # path already resolved above via exact check
-
-        # SPA fallback — React Router handles /dashboard, /login, etc.
         return FileResponse(_os.path.join(_DIST_DIR, "index.html"))
 
 else:
-    # Dev mode only — no dist folder present
     @app.api_route("/", methods=["GET", "HEAD"], tags=["Health"])
     def root():
         return {

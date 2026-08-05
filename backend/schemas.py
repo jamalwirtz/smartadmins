@@ -62,28 +62,38 @@ class TeacherOut(BaseModel):
 
 class SubjectCreate(BaseModel):
     name: str
+    # FIX: previously missing — the frontend has sent subject_code from
+    # several places (Classes.jsx inline "create subject", the new curriculum
+    # preset importer) but it was silently dropped by Pydantic since this
+    # schema had no matching field. Now it's actually persisted.
+    subject_code: Optional[str] = None
     grade_level: str
     weekly_periods: int = 4
     allows_double_period: bool = False
     is_static_eligible: bool = False
     color_hex: Optional[str] = None
+    education_system_id: Optional[str] = None
 
 class SubjectUpdate(BaseModel):
     name: Optional[str] = None
+    subject_code: Optional[str] = None
     grade_level: Optional[str] = None
     weekly_periods: Optional[int] = None
     allows_double_period: Optional[bool] = None
     is_static_eligible: Optional[bool] = None
     color_hex: Optional[str] = None
+    education_system_id: Optional[str] = None
 
 class SubjectOut(BaseModel):
     id: str
     name: str
+    subject_code: Optional[str] = None
     grade_level: str
     weekly_periods: int
     allows_double_period: bool
     is_static_eligible: bool
     color_hex: Optional[str]
+    education_system_id: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -94,17 +104,25 @@ class ClassCreate(BaseModel):
     name: str
     grade_level: str
     max_subjects_per_day: int = 8
+    # FIX: ClassSection.education_system_id already existed on the model but
+    # was never exposed here, so a class could never actually be tagged with
+    # a curriculum — the scheduler had no way to avoid cross-matching a CBC
+    # class with subjects imported for a different curriculum that happens
+    # to share the same grade_level string (e.g. both use "7").
+    education_system_id: Optional[str] = None
 
 class ClassUpdate(BaseModel):
     name: Optional[str] = None
     grade_level: Optional[str] = None
     max_subjects_per_day: Optional[int] = None
+    education_system_id: Optional[str] = None
 
 class ClassOut(BaseModel):
     id: str
     name: str
     grade_level: str
     max_subjects_per_day: int
+    education_system_id: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -222,6 +240,88 @@ class ExamSessionOut(BaseModel):
     start_date: str
     end_date: str
     slots: List[ExamSlotOut]
+
+    class Config:
+        from_attributes = True
+
+
+# ── Exam Layout Templates (multi-template exam editor) ────────────────────────
+
+class ExamLayoutTemplateCreate(BaseModel):
+    name: str
+    group_by: str = "day"          # day | class
+    orientation: str = "landscape" # landscape | portrait
+    show_duration: bool = True
+    show_invigilator: bool = True
+    show_room: bool = True
+    show_notes: bool = False
+    show_practical_tag: bool = True
+    footer_text: Optional[str] = None
+    warning_text: Optional[str] = None
+    is_default: bool = False
+
+
+class ExamLayoutTemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    group_by: Optional[str] = None
+    orientation: Optional[str] = None
+    show_duration: Optional[bool] = None
+    show_invigilator: Optional[bool] = None
+    show_room: Optional[bool] = None
+    show_notes: Optional[bool] = None
+    show_practical_tag: Optional[bool] = None
+    footer_text: Optional[str] = None
+    warning_text: Optional[str] = None
+
+
+class ExamLayoutTemplateOut(BaseModel):
+    id: str
+    name: str
+    is_default: bool
+    group_by: str
+    orientation: str
+    show_duration: bool
+    show_invigilator: bool
+    show_room: bool
+    show_notes: bool
+    show_practical_tag: bool
+    footer_text: Optional[str] = None
+    warning_text: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Timetable Layout Templates (curriculum-aware timetable editor) ────────────
+
+class TimetableLayoutTemplateCreate(BaseModel):
+    name: str
+    orientation: str = "landscape"   # landscape | portrait
+    show_locked_badge: bool = True
+    show_room: bool = False
+    footer_text: Optional[str] = None
+    warning_text: Optional[str] = None
+    is_default: bool = False
+
+
+class TimetableLayoutTemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    orientation: Optional[str] = None
+    show_locked_badge: Optional[bool] = None
+    show_room: Optional[bool] = None
+    footer_text: Optional[str] = None
+    warning_text: Optional[str] = None
+
+
+class TimetableLayoutTemplateOut(BaseModel):
+    id: str
+    name: str
+    is_default: bool
+    orientation: str
+    show_locked_badge: bool
+    show_room: bool
+    footer_text: Optional[str] = None
+    warning_text: Optional[str] = None
 
     class Config:
         from_attributes = True
