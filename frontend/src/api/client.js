@@ -29,8 +29,6 @@ function resolveBaseURL() {
   }
 
   // 4. Production (served by FastAPI on same origin): use empty string
-  //    API routes like /auth/login are served directly by FastAPI on the same host.
-  //    No VITE_API_URL needed when frontend and backend share one Render service.
   return ''
 }
 
@@ -92,7 +90,6 @@ export const teachersAPI = {
   delete:         (id)         => api.delete(`/teachers/${id}`),
   assignSubjects: (id, ids)    => api.post(`/teachers/${id}/subjects`, { subject_ids: ids }),
   schedule:       (id, draft)  => api.get(`/teachers/${id}/schedule?draft_id=${draft}`),
-  // Bulk import — CSV or .xlsx, matching the same fields as the manual form
   importFile:     (file) => {
     const f = new FormData(); f.append('file', file)
     return api.post('/teachers/import', f, { headers: { 'Content-Type': 'multipart/form-data' } })
@@ -155,6 +152,7 @@ export const examsAPI = {
   deleteSession:   (id)         => api.delete(`/exams/sessions/${id}`),
   validateSession: (id)         => api.get(`/exams/sessions/${id}/validate`),
   generateSlots:   (id, data)   => api.post(`/exams/sessions/${id}/generate`, data),
+  setSessionLayout:(id, layoutId) => api.put(`/exams/sessions/${id}/layout`, null, { params: { layout_id: layoutId || undefined } }),
 
   // Papers
   allPapers:       ()                    => api.get('/exams/papers'),
@@ -170,6 +168,39 @@ export const examsAPI = {
 }
 
 
+// ── Curriculum / Education Systems (onboarding) ────────────────────────────────
+export const curriculumAPI = {
+  list:            ()               => api.get('/education-systems'),
+  presets:         (code)           => api.get(`/education-systems/${code}/subject-presets`),
+  applyPresets:    (code, data)     => api.post(`/education-systems/${code}/apply-presets`, data),
+  getActive:       ()               => api.get('/education-systems/active'),
+  setActive:       (data)           => api.put('/education-systems/active', data),
+  createCustom:    (data)           => api.post('/education-systems', data),
+  delete:          (id)             => api.delete(`/education-systems/${id}`),
+}
+
+// ── Exam Layout Templates (multi-template exam editor) ─────────────────────────
+export const examLayoutsAPI = {
+  list:        ()         => api.get('/exam-layouts'),
+  getDefault:  ()         => api.get('/exam-layouts/default'),
+  get:         (id)       => api.get(`/exam-layouts/${id}`),
+  create:      (data)     => api.post('/exam-layouts', data),
+  update:      (id, data) => api.put(`/exam-layouts/${id}`, data),
+  setDefault:  (id)       => api.put(`/exam-layouts/${id}/set-default`),
+  delete:      (id)       => api.delete(`/exam-layouts/${id}`),
+}
+
+// ── Timetable Layout Templates (curriculum-aware timetable editor) ─────────────
+export const timetableLayoutsAPI = {
+  list:            ()         => api.get('/timetable-layouts'),
+  getDefault:      ()         => api.get('/timetable-layouts/default'),
+  create:          (data)     => api.post('/timetable-layouts', data),
+  update:          (id, data) => api.put(`/timetable-layouts/${id}`, data),
+  setDefault:      (id)       => api.put(`/timetable-layouts/${id}/set-default`),
+  delete:          (id)       => api.delete(`/timetable-layouts/${id}`),
+  setDraftLayout:  (draftId, layoutId) =>
+                     api.put(`/schedule/drafts/${draftId}/layout`, null, { params: { layout_id: layoutId || undefined } }),
+}
 
 
 // ── School Settings & Profile ─────────────────────────────────────────────────
@@ -248,7 +279,7 @@ export const supervisorsAPI = {
   delete:     (id)       => api.delete(`/supervisors/${id}`),
 }
 
-// ── Education Systems ─────────────────────────────────────────────────────────
+// ── Education Systems (legacy alias — kept for older callers) ──────────────────
 export const educationSystemsAPI = {
   list:   ()     => api.get('/education-systems'),
   create: (data) => api.post('/education-systems', data),
@@ -257,8 +288,9 @@ export const educationSystemsAPI = {
 
 // ── Export ────────────────────────────────────────────────────────────────────
 export const exportAPI = {
-  draftPdf:    (draft_id) =>
-                 api.get(`/export/draft/${draft_id}/pdf`,  { responseType: 'blob' }),
+  // layoutId is optional — omit to use the draft's pinned template or the org default
+  draftPdf:    (draft_id, layoutId = null) =>
+                 api.get(`/export/draft/${draft_id}/pdf`,  { responseType: 'blob', params: layoutId ? { layout_id: layoutId } : {} }),
   draftXlsx:   (draft_id) =>
                  api.get(`/export/draft/${draft_id}/xlsx`, { responseType: 'blob' }),
   draftCsv:    (draft_id) =>
@@ -267,8 +299,9 @@ export const exportAPI = {
                  api.get(`/export/teacher/${teacher_id}/pdf?draft_id=${draft_id}`, { responseType: 'blob' }),
   emailTeacher:(teacher_id, draft_id, custom_message = '') =>
                  api.post('/export/email/teacher', { teacher_id, draft_id, custom_message }),
-  examPdf:     (session_id) =>
-                 api.get(`/export/exam/${session_id}/pdf`,  { responseType: 'blob' }),
-  examXlsx:    (session_id) =>
-                 api.get(`/export/exam/${session_id}/xlsx`, { responseType: 'blob' }),
+  // layoutId is optional — omit to use the session's pinned template or the org default
+  examPdf:     (session_id, layoutId = null) =>
+                 api.get(`/export/exam/${session_id}/pdf`,  { responseType: 'blob', params: layoutId ? { layout_id: layoutId } : {} }),
+  examXlsx:    (session_id, layoutId = null) =>
+                 api.get(`/export/exam/${session_id}/xlsx`, { responseType: 'blob', params: layoutId ? { layout_id: layoutId } : {} }),
 }
