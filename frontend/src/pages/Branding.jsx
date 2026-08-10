@@ -113,9 +113,6 @@ export default function Branding() {
 
         {/* ── School Branding ── */}
         <Section icon={<School size={16}/>} title="School Branding">
-          {/* FIX: badge preview + upload controls are now centered as a
-              standalone, well-proportioned block instead of being squeezed
-              into a page meant for personal account settings. */}
           <div className="branding-badge-block">
             <div className="branding-badge-preview">
               {badgeUrl
@@ -130,9 +127,10 @@ export default function Branding() {
                   <Upload size={13}/> {badgeUrl ? 'Replace' : 'Upload'} Badge
                 </button>
                 {badgeUrl && (
-                  <button className="btn btn-sm" style={{ color:'var(--red,#ef4444)',
-                    background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)' }}
-                    onClick={handleRemoveBadge}>
+                  // FIX: now uses the shared .delete-btn class (same red-danger
+                  // treatment as Teachers/Subjects/Classes) instead of a
+                  // one-off inline style that drifted from the rest of the app.
+                  <button className="btn btn-sm delete-btn" onClick={handleRemoveBadge}>
                     <Trash2 size={13}/>
                   </button>
                 )}
@@ -221,7 +219,7 @@ export default function Branding() {
                     <div style={{ fontWeight:700, fontSize:12 }}>{o.label}</div>
                     <div style={{ fontSize:10, color:'var(--muted)', marginTop:1 }}>{o.hint}</div>
                   </div>
-                  {school.timetable_orientation===o.id && <Check size={12} style={{ marginLeft:'auto', color:'var(--amber)' }}/>}
+                  {school.timetable_orientation===o.id && <Check size={12} style={{ marginLeft:'auto', color:'var(--blue-400)' }}/>}
                 </button>
               ))}
             </div>
@@ -240,7 +238,7 @@ export default function Branding() {
                   onClick={() => patch({ teacher_name_format: opt.id }, `Name format: ${opt.label}`)}>
                   <div style={{fontWeight:700,fontSize:12}}>{opt.label}</div>
                   <div style={{fontSize:10,color:'var(--muted)',fontStyle:'italic'}}>{opt.ex}</div>
-                  {school.teacher_name_format===opt.id && <Check size={11} style={{color:'var(--amber)',marginTop:2}}/>}
+                  {school.teacher_name_format===opt.id && <Check size={11} style={{color:'var(--blue-400)',marginTop:2}}/>}
                 </button>
               ))}
             </div>
