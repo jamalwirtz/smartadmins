@@ -68,10 +68,6 @@ class Subject(Base):
     __tablename__ = "subjects"
     id                  = Column(String(36), primary_key=True, default=_uuid)
     name                = Column(String(120), nullable=False)
-    # FIX: was accepted by the frontend (Classes.jsx's inline "create subject"
-    # step, curriculum-preset import) but silently dropped — SubjectCreate/
-    # SubjectUpdate had no matching field, so Pydantic ignored it and every
-    # subject code entered anywhere in the app was thrown away. Now persisted.
     subject_code        = Column(String(30),  nullable=True)   # e.g. "0580" (CAIE), "MATH-AA-HL" (IB)
     grade_level         = Column(String(20),  nullable=False)
     weekly_periods      = Column(Integer, default=4)
@@ -360,7 +356,7 @@ class Supervisor(Base):
     exam_slots = relationship("ExamSlot", back_populates="invigilator")
 
 
-# ── Exam Layout Template (NEW) ─────────────────────────────────────────────────
+# ── Exam Layout Template ────────────────────────────────────────────────────────
 class ExamLayoutTemplate(Base):
     """
     A reusable, editable exam-timetable layout: which columns/fields appear,
@@ -396,7 +392,7 @@ class ExamLayoutTemplate(Base):
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
-# ── Timetable Layout Template (NEW) ────────────────────────────────────────────
+# ── Timetable Layout Template ───────────────────────────────────────────────────
 class TimetableLayoutTemplate(Base):
     """
     Twin of ExamLayoutTemplate for regular class timetables — lets an admin
@@ -404,11 +400,19 @@ class TimetableLayoutTemplate(Base):
     banners) for the weekly timetable PDF/Excel/CSV exports, mirroring the
     exam schedule editor so both "schedules" (exams and timetables) share
     the same editing model.
+
+    description/icon/accent_color are presentation-only fields used to give
+    each built-in and custom template a distinct, recognisable look in the
+    layout gallery (see TimetableLayouts.jsx) — they don't affect the
+    generated PDF content itself.
     """
     __tablename__ = "timetable_layout_templates"
 
     id          = Column(String(36), primary_key=True, default=_uuid)
     name        = Column(String(80),  nullable=False)
+    description = Column(String(300), nullable=True)   # short blurb shown in the template gallery
+    icon        = Column(String(8),   nullable=True)    # a single emoji shown on the template card
+    accent_color= Column(String(7),   nullable=True)    # hex colour used for the card's accent bar/icon
     is_default  = Column(Boolean,     default=False)
     orientation = Column(String(12),  default="landscape")  # landscape | portrait
 

@@ -39,7 +39,23 @@ class SchedulingEngine:
     # ── Public API ───────────────────────────────────────────────────────────
 
     def generate_drafts(self, count: int = 3, seeds: List[int] = None) -> List[TimetableDraft]:
-        seeds = (seeds or self.DEFAULT_SEEDS)[:count]
+        # FIX: guarantee exactly `count` drafts are produced even when the
+        # caller passes fewer seeds than count (or none at all) — previously
+        # `seeds[:count]` on a short/empty list silently produced fewer
+        # drafts than requested, which is why "3 drafts" sometimes turned
+        # into 1 or 2. Pad out from DEFAULT_SEEDS, then fall back to random
+        # seeds, until we have exactly `count` unique seeds.
+        count = count or 3
+        seeds = list(seeds or [])
+        pool = list(self.DEFAULT_SEEDS)
+        i = 0
+        while len(seeds) < count:
+            candidate = pool[i] if i < len(pool) else random.randint(1000, 9999)
+            if candidate not in seeds:
+                seeds.append(candidate)
+            i += 1
+        seeds = seeds[:count]
+
         drafts = []
         for i, seed in enumerate(seeds):
             draft = TimetableDraft(
@@ -235,15 +251,11 @@ class SchedulingEngine:
         new_slots: List[TimetableSlot] = []
 
         for cls in classes:
-            # FIX: previously matched purely on grade_level, so a class
-            # tagged with one curriculum (e.g. CBC) could get scheduled with
-            # subjects imported from a different curriculum's preset that
-            # happens to use the same grade_level label. Now: if the class
-            # has a curriculum set, only match subjects tagged with that same
-            # curriculum OR subjects with no curriculum tag at all (so
-            # manually-added, curriculum-agnostic subjects still work).
-            # Classes with no curriculum set keep the old grade_level-only
-            # behavior for full backward compatibility.
+            # If the class has a curriculum set, only match subjects tagged
+            # with that same curriculum OR subjects with no curriculum tag
+            # at all (so manually-added, curriculum-agnostic subjects still
+            # work). Classes with no curriculum set keep the old
+            # grade_level-only behavior.
             if cls.education_system_id:
                 grade_subjects = [
                     s for s in subjects
@@ -322,7 +334,7 @@ class SchedulingEngine:
                     class_occupied.add((cls.id, day, period))
                     teacher_weekly[chosen.id] += 1
                     subject_day_count[subj.id][day] += 1
-                    pool_set.discard((day, period))  # FIX: discard never raises KeyError
+                    pool_set.discard((day, period))
                     placed = True
                     break
                 # If placed is False, we soft-skip (no eligible slot found)

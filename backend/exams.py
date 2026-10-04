@@ -100,7 +100,7 @@ def _slot_or_404(slot_id: str, db: Session) -> ExamSlot:
 
 def _sync_room_name(slot: ExamSlot, db: Session) -> None:
     """
-    FIX: keep the plain-text `room` column in sync with the FK-based `room_id`
+    Keep the plain-text `room` column in sync with the FK-based `room_id`
     selection. Exports (PDF/Excel) and older code read `slot.room` as a string,
     so picking a Room from the dropdown needs to also populate that string —
     otherwise exports would show "—" even though a room was actually assigned.
@@ -417,8 +417,7 @@ def update_slot(
     for field, val in data.model_dump(exclude_none=True).items():
         setattr(slot, field, val)
 
-    # FIX: if a room was picked via room_id (dropdown), keep the plain `room`
-    # text column in sync so PDF/Excel exports show it correctly.
+    # Keep the plain `room` text column in sync when a room_id was picked.
     if data.room_id is not None:
         _sync_room_name(slot, db)
 
@@ -506,7 +505,9 @@ def generate(
 
     if not work_items:
         return {"status": "nothing_to_schedule",
-                "message": "All selected papers are already scheduled"}
+                "message": "All selected papers are already scheduled — or none of the "
+                           "selected subjects have any exam papers configured yet. "
+                           "Add papers from Manage Papers first."}
 
     # day-load: class_id → {day → count}
     existing_slots = db.query(ExamSlot).filter(
@@ -534,12 +535,22 @@ def generate(
             # Check max_per_day limit
             current_load = day_load.get(cls.id, {}).get(day, 0)
             if current_load < req.max_per_day:
+                # FIX: previously every generated slot used req.start_period
+                # unchanged, regardless of how many exams that class already
+                # had that day. The second (and later) exam for the same
+                # class on the same day therefore got the exact same
+                # (day, period) as the first — which collides with the
+                # exam_slots table's own uq_exam_time uniqueness constraint
+                # and made the whole bulk insert fail below whenever
+                # max_per_day was set above 1. Offsetting the period by the
+                # day's current load keeps each exam on that day distinct.
+                period = req.start_period + current_load
                 new_slots.append(ExamSlot(
                     exam_session_id=session_id,
                     paper_id=paper.id,
                     class_id=cls.id,
                     day=day,
-                    period=req.start_period,
+                    period=period,
                 ))
                 # Update day_load immediately so next iteration sees it
                 day_load.setdefault(cls.id, {})[day] = current_load + 1

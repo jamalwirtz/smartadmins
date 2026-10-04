@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import {
   Zap, RefreshCw, Lock, Unlock, Download, CheckCircle, Check,
   Trash2, ShieldCheck, Users, Eye, Palette, X, CalendarDays, Pencil, Plus,
-  ChevronDown, FileSpreadsheet, FileText
+  ChevronDown, FileSpreadsheet, FileText, ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday']
@@ -121,7 +121,17 @@ function TimetableGrid({ slots, classes, onLock, onMove, activeDraftId }) {
 
   useEffect(() => {
     if (classes.length && !selectedClass) setSelectedClass(classes[0]?.id || '')
-  }, [classes])
+  }, [classes]) // eslint-disable-line
+
+  // FIX: previously there was no strong visual indicator of which class's
+  // timetable was currently being edited, and switching classes meant
+  // hunting through a row of small buttons. This adds a bold "now editing"
+  // header at the top of the grid plus prev/next navigation, so the
+  // currently-open class is unmistakable and easy to step through.
+  const currentIndex = classes.findIndex(c => c.id === selectedClass)
+  const currentClass = classes[currentIndex]
+  const goPrev = () => currentIndex > 0 && setSelectedClass(classes[currentIndex - 1].id)
+  const goNext = () => currentIndex < classes.length - 1 && setSelectedClass(classes[currentIndex + 1].id)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -168,9 +178,39 @@ function TimetableGrid({ slots, classes, onLock, onMove, activeDraftId }) {
 
   return (
     <div>
+      {/* ── Prominent "now editing" header — bold class name + prev/next ── */}
+      <div style={{
+        display:'flex', alignItems:'center', gap:12, marginBottom:14,
+        padding:'10px 16px', background:'var(--surface-2)',
+        border:'1.5px solid var(--blue-300)', borderRadius:'var(--r-lg)',
+      }}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={goPrev} disabled={currentIndex <= 0}>
+          <ChevronLeft size={13}/> Prev
+        </button>
+        <div style={{ flex:1, textAlign:'center', minWidth:0 }}>
+          <div style={{ fontSize:10.5, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.6 }}>
+            Now editing
+          </div>
+          <div style={{
+            fontSize:21, fontWeight:900, color:'var(--blue-400)', lineHeight:1.25,
+            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+          }}>
+            {currentClass ? currentClass.class_name : 'No class selected'}
+          </div>
+          {classes.length > 0 && (
+            <div style={{ fontSize:11, color:'var(--muted)', marginTop:1 }}>
+              Class {currentIndex + 1} of {classes.length}
+            </div>
+          )}
+        </div>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={goNext} disabled={currentIndex >= classes.length - 1}>
+          Next <ChevronRight size={13}/>
+        </button>
+      </div>
+
       {/* Class selector */}
       <div className="flex-row mb-4" style={{ flexWrap:'wrap', gap:6 }}>
-        <span className="text-muted text-sm" style={{ fontWeight:700 }}>Class:</span>
+        <span className="text-muted text-sm" style={{ fontWeight:700 }}>Switch class:</span>
         {classes.map(c => (
           <motion.button
             key={c.id}
@@ -178,6 +218,7 @@ function TimetableGrid({ slots, classes, onLock, onMove, activeDraftId }) {
             onClick={() => setSelectedClass(c.id)}
             whileHover={{ scale:1.04 }}
             whileTap={{ scale:0.96 }}
+            style={selectedClass === c.id ? { boxShadow:'0 0 0 2px var(--blue-300)', fontWeight:800 } : {}}
           >
             {c.class_name}
           </motion.button>
@@ -269,7 +310,9 @@ function TimetableExportDropdown({ onPdf, onCsv, onXlsx, layouts = [], activeLay
 
             {layouts.length > 0 && (
               <div className="exam-export-layout-section">
-                <div className="exam-export-layout-label">PDF layout template</div>
+                <div className="exam-export-layout-label">
+                  PDF layout template ({layouts.length} available)
+                </div>
                 <button className={`exam-export-layout-opt${!activeLayoutId ? ' active' : ''}`}
                   onClick={() => onSelectLayout(null)}>
                   {!activeLayoutId && <Check size={12}/>}
@@ -279,7 +322,7 @@ function TimetableExportDropdown({ onPdf, onCsv, onXlsx, layouts = [], activeLay
                   <button key={l.id} className={`exam-export-layout-opt${activeLayoutId===l.id ? ' active' : ''}`}
                     onClick={() => onSelectLayout(l.id)}>
                     {activeLayoutId === l.id && <Check size={12}/>}
-                    {l.name}
+                    {l.icon ? `${l.icon} ` : ''}{l.name}
                   </button>
                 ))}
               </div>

@@ -62,10 +62,6 @@ class TeacherOut(BaseModel):
 
 class SubjectCreate(BaseModel):
     name: str
-    # FIX: previously missing — the frontend has sent subject_code from
-    # several places (Classes.jsx inline "create subject", the new curriculum
-    # preset importer) but it was silently dropped by Pydantic since this
-    # schema had no matching field. Now it's actually persisted.
     subject_code: Optional[str] = None
     grade_level: str
     weekly_periods: int = 4
@@ -104,11 +100,6 @@ class ClassCreate(BaseModel):
     name: str
     grade_level: str
     max_subjects_per_day: int = 8
-    # FIX: ClassSection.education_system_id already existed on the model but
-    # was never exposed here, so a class could never actually be tagged with
-    # a curriculum — the scheduler had no way to avoid cross-matching a CBC
-    # class with subjects imported for a different curriculum that happens
-    # to share the same grade_level string (e.g. both use "7").
     education_system_id: Optional[str] = None
 
 class ClassUpdate(BaseModel):
@@ -296,6 +287,9 @@ class ExamLayoutTemplateOut(BaseModel):
 
 class TimetableLayoutTemplateCreate(BaseModel):
     name: str
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    accent_color: Optional[str] = None
     orientation: str = "landscape"   # landscape | portrait
     show_locked_badge: bool = True
     show_room: bool = False
@@ -306,6 +300,9 @@ class TimetableLayoutTemplateCreate(BaseModel):
 
 class TimetableLayoutTemplateUpdate(BaseModel):
     name: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    accent_color: Optional[str] = None
     orientation: Optional[str] = None
     show_locked_badge: Optional[bool] = None
     show_room: Optional[bool] = None
@@ -316,6 +313,9 @@ class TimetableLayoutTemplateUpdate(BaseModel):
 class TimetableLayoutTemplateOut(BaseModel):
     id: str
     name: str
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    accent_color: Optional[str] = None
     is_default: bool
     orientation: str
     show_locked_badge: bool

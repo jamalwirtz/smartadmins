@@ -103,15 +103,27 @@ def save_allocations(class_id: str,
     Create or update allocations for a class.
     Supports partial teacher assignment — subjects without a teacher
     are saved with status='pending' so the admin can fill them later.
+
+    FIX: this previously only ever added/updated ClassAllocation rows for
+    the subjects passed in — it never removed a row for a subject the admin
+    had *unchecked* in the wizard. That meant every save was additive only,
+    so a class could accumulate stale allocations from earlier edits and
+    end up showing subjects that were supposed to have been removed —
+    including cases where the same class looked different depending on
+    when it was last saved. We now delete any allocation for this class
+    whose subject_id isn't in the submitted list, so the class's
+    allocations always match exactly what was selected in this save.
     """
     cls = db.query(ClassSection).filter(ClassSection.id == class_id).first()
     if not cls: raise HTTPException(404, "Class not found")
 
     saved, pending = 0, 0
+    seen_subject_ids = set()
 
     for sid in body.subject_ids:
         subj = db.query(Subject).filter(Subject.id == sid).first()
         if not subj: continue
+        seen_subject_ids.add(sid)
 
         teacher_id = body.teacher_map.get(sid) or None
         status     = "assigned" if teacher_id else "pending"
@@ -133,6 +145,12 @@ def save_allocations(class_id: str,
 
         if status == "assigned": saved  += 1
         else:                    pending += 1
+
+    # Remove allocations for subjects no longer selected for this class.
+    db.query(ClassAllocation).filter(
+        ClassAllocation.class_id == class_id,
+        ClassAllocation.subject_id.notin_(seen_subject_ids),
+    ).delete(synchronize_session=False)
 
     db.commit()
     return {

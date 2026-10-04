@@ -51,7 +51,10 @@ def _slot_out(s, subjects_map, teachers_map, classes_map):
 @router.post("/generate")
 async def generate(req: GenerateRequest, db: Session = Depends(get_db), _=Depends(require_admin)):
     engine = SchedulingEngine(db)
-    drafts = engine.generate_drafts(count=req.draft_count, seeds=req.seeds)
+    # FIX: force exactly 3 drafts server-side regardless of what draft_count
+    # the caller sends — this is what "always generate 3 versions" actually
+    # requires; trusting the request body here is what let this regress.
+    drafts = engine.generate_drafts(count=3, seeds=req.seeds)
     payload = [{"id": d.id, "name": d.name, "seed": d.seed, "status": d.status,
                 "slot_count": len(d.slots), "created_at": d.created_at.isoformat()} for d in drafts]
     await ws_manager.broadcast_global_event({"event": "draft_generated", "drafts": payload})

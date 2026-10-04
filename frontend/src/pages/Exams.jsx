@@ -21,6 +21,15 @@ const STATUS = {
   completed: { bg:'rgba(107,114,128,.13)', text:'#9ca3af', dot:'#6b7280', label:'Completed' },
 }
 
+// ── Date helpers — used to pre-fill the create-session form with sensible
+//    defaults instead of leaving the admin to type two raw dates by hand ────
+const todayStr = () => new Date().toISOString().slice(0, 10)
+const addDaysStr = (days) => {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 // ── Tiny reusable components ──────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const s = STATUS[status] || STATUS.draft
@@ -154,6 +163,21 @@ export default function Exams() {
   useEffect(() => { if (view !== 'list') loadSupport() }, [view, loadSupport])
 
   // ── actions ──────────────────────────────────────────────────────────────
+  const openCreateForm = () => {
+    // Pre-fill with today → +2 weeks so the admin isn't starting from two
+    // blank date fields — this was the main friction point in setup.
+    setCreateForm({ name:'', start_date: todayStr(), end_date: addDaysStr(13), description:'' })
+    setShowCreate(true)
+  }
+
+  const applyQuickRange = (days) => {
+    setCreateForm(f => ({
+      ...f,
+      start_date: f.start_date || todayStr(),
+      end_date: addDaysStr(days),
+    }))
+  }
+
   const handleCreateSession = async (e) => {
     e.preventDefault()
     if (!createForm.name.trim()) return toast.error('Session name required')
@@ -194,8 +218,20 @@ export default function Exams() {
     if (!genForm.school_days.length) return toast.error('Select at least one day')
     try {
       const r = await examsAPI.generateSlots(active.id, genForm)
-      toast.success(r.data.message || `Created ${r.data.slots_created} slots ✅`, { duration:4000 })
-      setShowGenerate(false)
+      if (r.data.status === 'nothing_to_schedule') {
+        // FIX: the backend can legitimately schedule zero slots (e.g. none
+        // of the selected subjects have papers configured yet) and this
+        // used to be shown as a plain success toast, making it look like
+        // generation worked when nothing actually happened.
+        toast.error(
+          r.data.message ||
+          'Nothing to schedule — the selected subjects have no exam papers configured yet. Use "Manage Papers" first.',
+          { duration: 7000 }
+        )
+      } else {
+        toast.success(r.data.message || `Created ${r.data.slots_created} slots ✅`, { duration:4000 })
+        setShowGenerate(false)
+      }
       loadSession(active.id)
     } catch (err) { toast.error(err?.response?.data?.detail || 'Generation failed', { duration:6000 }) }
   }
@@ -311,6 +347,16 @@ export default function Exams() {
     ? [...new Set((active.slots || []).map(s => s.period))].sort((a,b) => a-b)
     : []
 
+  // Subjects selected for generation that have no papers configured yet —
+  // shown as a warning inside the Generate dialog so it's visible *before*
+  // clicking Generate rather than discovered afterward.
+  const missingPaperSubjects = subjects
+    .filter(s => genForm.subject_ids.includes(s.id))
+    .filter(s => {
+      const entry = papersData.find(p => p.subject_id === s.id)
+      return !entry || entry.papers.length === 0
+    })
+
   // ────────────────────────────────────────────────────────────────────────────
   // VIEW: LIST
   // ────────────────────────────────────────────────────────────────────────────
@@ -331,7 +377,7 @@ export default function Exams() {
           <button className="btn btn-secondary" onClick={() => { setShowTemplates(true); loadSupport() }}>
             <Layers size={14}/> From Template
           </button>
-          <button className="btn btn-accent" onClick={() => setShowCreate(true)}>
+          <button className="btn btn-accent" onClick={openCreateForm}>
             <Plus size={14}/> New Session
           </button>
         </div>
@@ -369,6 +415,8 @@ export default function Exams() {
                     onClick={() => setTplApplyForm(f => ({
                       ...f, template_id: tpl.id,
                       session_name: tpl.config.suggested_name || tpl.name,
+                      start_date: f.start_date || todayStr(),
+                      end_date: f.end_date || addDaysStr((tpl.config.duration_days || 10) - 1),
                     }))}>
                     <div className="exam-tpl-icon">{tpl.icon}</div>
                     <div className="exam-tpl-name">{tpl.name}</div>
@@ -483,6 +531,24 @@ export default function Exams() {
                     onChange={e => setCreateForm(f=>({...f,end_date:e.target.value}))} />
                 </div>
               </div>
+
+              {/* Quick date-range shortcuts — the main friction point in setup
+                  was typing two raw dates by hand with no starting point. */}
+              <div style={{ display:'flex', gap:6, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
+                <span style={{ fontSize:11, color:'var(--muted)' }}>Quick range from start date:</span>
+                {[
+                  { label:'1 week',  days:6  },
+                  { label:'2 weeks', days:13 },
+                  { label:'3 weeks', days:20 },
+                  { label:'1 month', days:29 },
+                ].map(r => (
+                  <button key={r.label} type="button" className="exam-day-btn"
+                    onClick={() => applyQuickRange(r.days)}>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="form-group" style={{ marginBottom:14 }}>
                 <label className="form-label">Description (optional)</label>
                 <input className="form-input" value={createForm.description}
@@ -507,7 +573,7 @@ export default function Exams() {
       {loading ? <Loader /> : sessions.length === 0 ? (
         <EmptyState icon={Calendar} title="No exam sessions yet"
           body="Start from a template or create a blank session"
-          action="Create Session" onAction={() => setShowCreate(true)} />
+          action="Create Session" onAction={openCreateForm} />
       ) : (
         <div className="exam-session-grid">
           {sessions.map((s, i) => (
@@ -714,17 +780,26 @@ export default function Exams() {
                     <span className="exam-sel-count">({genForm.subject_ids.length} selected)</span>
                   </label>
                   <div className="exam-check-list">
-                    {subjects.map(s => (
-                      <label key={s.id} className="exam-check-item">
-                        <input type="checkbox"
-                          checked={genForm.subject_ids.includes(s.id)}
-                          onChange={() => setGenForm(f=>({
-                            ...f, subject_ids: toggleId(f.subject_ids, s.id)
-                          }))} />
-                        <span>{s.name}</span>
-                        <span className="exam-check-meta">Gr{s.grade_level}</span>
-                      </label>
-                    ))}
+                    {subjects.map(s => {
+                      const entry = papersData.find(p => p.subject_id === s.id)
+                      const hasPapers = entry && entry.papers.length > 0
+                      return (
+                        <label key={s.id} className="exam-check-item">
+                          <input type="checkbox"
+                            checked={genForm.subject_ids.includes(s.id)}
+                            onChange={() => setGenForm(f=>({
+                              ...f, subject_ids: toggleId(f.subject_ids, s.id)
+                            }))} />
+                          <span>{s.name}</span>
+                          {!hasPapers && (
+                            <span className="exam-check-meta" style={{ color:'#ef4444' }}>
+                              no papers
+                            </span>
+                          )}
+                          {hasPapers && <span className="exam-check-meta">Gr{s.grade_level}</span>}
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
                 {/* Classes */}
@@ -798,6 +873,25 @@ export default function Exams() {
                   </div>
                 </label>
               </div>
+
+              {/* Visible warning BEFORE clicking Generate — this is the info
+                  that previously only showed up after the fact as a vague
+                  success toast with 0 slots created. */}
+              {missingPaperSubjects.length > 0 && (
+                <div className="wiz-info-banner"
+                  style={{ marginTop:12, background:'rgba(239,68,68,.08)', borderColor:'rgba(239,68,68,.3)' }}>
+                  <AlertTriangle size={14} color="#ef4444"/>
+                  <span>
+                    No papers configured yet for: <strong>{missingPaperSubjects.map(s=>s.name).join(', ')}</strong>.
+                    These subjects will be skipped when you generate.{' '}
+                    <a href="#" onClick={e => { e.preventDefault(); setShowGenerate(false); setView('papers') }}
+                      style={{ color:'var(--amber)' }}>
+                      Configure papers →
+                    </a>
+                  </span>
+                </div>
+              )}
+
               <div className="wiz-info-banner" style={{ marginTop:12 }}>
                 <Info size={14}/>
                 <span>

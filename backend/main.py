@@ -3,6 +3,7 @@ SSTG – FastAPI Application Factory
 Run:    uvicorn main:app --reload        (from backend/)
         python app.py                    (convenience shim)
 """
+import re
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -18,9 +19,6 @@ import ws_routes as websockets
 settings = get_settings()
 
 # Create all tables on startup (safe to call repeatedly — skips existing tables)
-# NOTE: this is also what creates the new `exam_layout_templates` table for
-# the multi-template exam editor — it's a brand-new table so no ALTER TABLE
-# migration is needed for it, only for new columns on existing tables (below).
 Base.metadata.create_all(bind=engine)
 
 # ── Auto-seed demo data on first boot ────────────────────────────────────────
@@ -93,7 +91,6 @@ def _ensure_demo_data():
         print("[boot] admin/teachers/subjects seeded ✅")
 
         # Class sections in a SEPARATE transaction (non-critical)
-        # Isolated so schema-mismatch errors don't roll back the admin user
         try:
             for name, grade in [("7A","7"), ("7B","7"), ("8A","8"), ("8B","8")]:
                 db.add(ClassSection(name=name, grade_level=grade))
@@ -123,61 +120,103 @@ def _ensure_demo_data():
 _ensure_demo_data()
 
 # ── Auto-migrate: add any new columns to existing tables ─────────────────────
+_MIGRATIONS = [
+    # ClassSection new columns
+    "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS stream VARCHAR(40)",
+    "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 40",
+    "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
+    # SchoolSettings new columns
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS badge_position VARCHAR(20) DEFAULT 'top-left'",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_motto VARCHAR(200)",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_email VARCHAR(120)",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_phone VARCHAR(40)",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_address VARCHAR(300)",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS timetable_orientation VARCHAR(12) DEFAULT 'horizontal'",
+    # ExamSlot new column
+    "ALTER TABLE exam_slots ADD COLUMN IF NOT EXISTS room_id VARCHAR(36)",
+    # TimetableSlot new columns for special events
+    "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS slot_type VARCHAR(30) DEFAULT 'lesson'",
+    "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS event_label VARCHAR(80)",
+    "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS event_color VARCHAR(7)",
+    # Teacher new columns
+    "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS initials VARCHAR(10)",
+    "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS short_name VARCHAR(40)",
+    "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS phone VARCHAR(40)",
+    # SchoolSettings name format + exam toggles
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS teacher_name_format VARCHAR(20) DEFAULT 'full_name'",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_supervisors BOOLEAN DEFAULT TRUE",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_rooms BOOLEAN DEFAULT TRUE",
+    # Curriculum-aware onboarding
+    "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS subject_code VARCHAR(30)",
+    "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
+    "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE",
+    # Multi-template exam editor
+    "ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
+    # Curriculum-aware timetable editor
+    "ALTER TABLE timetable_drafts ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
+    # NEW: richer timetable-layout template presentation fields (gallery
+    # icon/description/accent colour) for the expanded template gallery.
+    "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS description VARCHAR(300)",
+    "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS icon VARCHAR(8)",
+    "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS accent_color VARCHAR(7)",
+]
+
+_ALTER_RE = re.compile(
+    r"ALTER TABLE (\w+) ADD COLUMN IF NOT EXISTS (\w+) (.+)$", re.IGNORECASE
+)
+
+
+def _sqlite_column_exists(db, table: str, column: str) -> bool:
+    from sqlalchemy import text
+    try:
+        rows = db.execute(text(f"PRAGMA table_info({table})")).fetchall()
+        return any(r[1] == column for r in rows)
+    except Exception:
+        # If the table itself doesn't exist yet, create_all will have made
+        # it already with the column baked in — nothing to migrate.
+        return True
+
+
 def _run_migrations():
     """
-    Safe ALTER TABLE statements — each is idempotent (IF NOT EXISTS).
-    Handles schema changes without Alembic for simple column additions.
+    Idempotent ALTER TABLE runner.
+
+    FIX: this previously only ran on PostgreSQL (`if is_pg:` gated the whole
+    loop), because SQLite doesn't support the `ADD COLUMN IF NOT EXISTS`
+    syntax used in the migration strings. That meant every column added
+    here silently never existed on local SQLite installs, producing bugs
+    that looked unrelated to migrations (missing fields, 500s on save) —
+    this was called out as a known gap in project notes. Now each
+    migration is parsed into (table, column, coltype); on SQLite we check
+    PRAGMA table_info for the column first and run a plain
+    `ALTER TABLE ... ADD COLUMN ...` (which SQLite does support) only when
+    it's actually missing. PostgreSQL keeps using the original
+    IF-NOT-EXISTS statements directly, since those already work there.
     """
     from sqlalchemy import text
-    from database import SessionLocal
+    from database import SessionLocal, db_url
     db = SessionLocal()
-    migrations = [
-        # ClassSection new columns
-        "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS stream VARCHAR(40)",
-        "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 40",
-        "ALTER TABLE class_sections ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
-        # SchoolSettings new columns
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS badge_position VARCHAR(20) DEFAULT 'top-left'",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_motto VARCHAR(200)",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_email VARCHAR(120)",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_phone VARCHAR(40)",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_address VARCHAR(300)",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS timetable_orientation VARCHAR(12) DEFAULT 'horizontal'",
-        # ExamSlot new column
-        "ALTER TABLE exam_slots ADD COLUMN IF NOT EXISTS room_id VARCHAR(36)",
-        # TimetableSlot new columns for special events
-        "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS slot_type VARCHAR(30) DEFAULT 'lesson'",
-        "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS event_label VARCHAR(80)",
-        "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS event_color VARCHAR(7)",
-        # Teacher new columns
-        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS initials VARCHAR(10)",
-        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS short_name VARCHAR(40)",
-        "ALTER TABLE teachers ADD COLUMN IF NOT EXISTS phone VARCHAR(40)",
-        # SchoolSettings name format + exam toggles
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS teacher_name_format VARCHAR(20) DEFAULT 'full_name'",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_supervisors BOOLEAN DEFAULT TRUE",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS exam_include_rooms BOOLEAN DEFAULT TRUE",
-        # ── Curriculum-aware onboarding (NEW) ──────────────────────────────
-        "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS subject_code VARCHAR(30)",
-        "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS education_system_id VARCHAR(36)",
-        "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE",
-        # ── Multi-template exam editor (NEW) ───────────────────────────────
-        "ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
-        # ── Curriculum-aware timetable editor (NEW) ────────────────────────
-        "ALTER TABLE timetable_drafts ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
-    ]
+    is_pg = 'postgresql' in db_url
     try:
-        from database import db_url
-        is_pg = 'postgresql' in db_url
-        if is_pg:  # Only run on PostgreSQL — SQLite uses create_all
-            for sql in migrations:
+        for sql in _MIGRATIONS:
+            if is_pg:
                 try:
                     db.execute(text(sql))
                 except Exception:
-                    pass  # Column may already exist
-            db.commit()
-            print("[boot] DB migrations applied ✅")
+                    pass  # column may already exist
+            else:
+                m = _ALTER_RE.match(sql)
+                if not m:
+                    continue
+                table, column, coltype = m.groups()
+                if not _sqlite_column_exists(db, table, column):
+                    try:
+                        db.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
+                    except Exception:
+                        pass
+        db.commit()
+        print(f"[boot] DB migrations applied ✅ ({'postgres' if is_pg else 'sqlite'})")
     except Exception as e:
         print(f"[boot] Migration note: {e}")
     finally:
@@ -199,9 +238,6 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-# IMPORTANT: allow_credentials=True is ILLEGAL when allow_origins=["*"].
-# Starlette raises a ValueError and ALL requests are blocked.
-# Rule: wildcard origin → no credentials. Specific origins → credentials OK.
 _origins = settings.cors_origins_list
 _wildcard = _origins == ["*"]
 
@@ -287,13 +323,10 @@ def debug_status():
 
 
 # ── Serve React frontend (production) ─────────────────────────────────────────
-# When deployed on Render as a single service, the React app is built into
-# frontend/dist/ and FastAPI serves it directly — no separate static host needed.
 _THIS_DIR  = _os.path.dirname(_os.path.abspath(__file__))
 _DIST_DIR  = _os.path.join(_THIS_DIR, "..", "frontend", "dist")
 _DIST_DIR  = _os.path.normpath(_DIST_DIR)
 
-# ── Serve React SPA (production) ──────────────────────────────────────────────
 if _os.path.isdir(_DIST_DIR):
 
     @app.get("/{full_path:path}", include_in_schema=False)
