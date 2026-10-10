@@ -3,8 +3,9 @@ SSTG – FastAPI Application Factory
 Run:    uvicorn main:app --reload        (from backend/)
         python app.py                    (convenience shim)
 """
+import logging
 import re
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import os as _os
@@ -12,14 +13,28 @@ import os as _os
 from config import get_settings
 from database import Base, engine
 import models  # noqa: registers all ORM models
+import personal_timetable  # noqa: registers PersonalTimetable/PersonalEvent models
+import billing             # noqa: registers Subscription model
 
 import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings, allocations, education_systems, rooms, supervisors, import_export, exam_layouts, timetable_layouts
 import ws_routes as websockets
+from security import get_current_user
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Create all tables on startup (safe to call repeatedly — skips existing tables)
 Base.metadata.create_all(bind=engine)
+
+# HARDENING: a wildcard CORS origin is a common accidental production
+# footgun — it's fine for a demo/public API with no cookies, but worth
+# surfacing loudly in logs so it's a deliberate choice, not an oversight.
+if settings.cors_origins_list == ["*"]:
+    logger.warning(
+        "CORS_ORIGINS is '*' — any website can call this API from a "
+        "browser. Fine for local dev/demo; set specific origins "
+        "(e.g. your deployed frontend URL) before going to production."
+    )
 
 # ── Auto-seed demo data on first boot ────────────────────────────────────────
 def _ensure_demo_data():
@@ -155,11 +170,15 @@ _MIGRATIONS = [
     "ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
     # Curriculum-aware timetable editor
     "ALTER TABLE timetable_drafts ADD COLUMN IF NOT EXISTS layout_template_id VARCHAR(36)",
-    # NEW: richer timetable-layout template presentation fields (gallery
-    # icon/description/accent colour) for the expanded template gallery.
+    # Timetable-layout gallery presentation fields
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS description VARCHAR(300)",
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS icon VARCHAR(8)",
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS accent_color VARCHAR(7)",
+    # NEW: billing — Subscription status/cycle columns in case an older row
+    # exists without them (table itself is created fresh by create_all, but
+    # this keeps the pattern consistent if the model gains fields later)
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR(10) DEFAULT 'monthly'",
 ]
 
 _ALTER_RE = re.compile(
@@ -173,26 +192,18 @@ def _sqlite_column_exists(db, table: str, column: str) -> bool:
         rows = db.execute(text(f"PRAGMA table_info({table})")).fetchall()
         return any(r[1] == column for r in rows)
     except Exception:
-        # If the table itself doesn't exist yet, create_all will have made
-        # it already with the column baked in — nothing to migrate.
         return True
 
 
 def _run_migrations():
     """
-    Idempotent ALTER TABLE runner.
+    Idempotent ALTER TABLE runner — dialect-aware (see note below).
 
-    FIX: this previously only ran on PostgreSQL (`if is_pg:` gated the whole
-    loop), because SQLite doesn't support the `ADD COLUMN IF NOT EXISTS`
-    syntax used in the migration strings. That meant every column added
-    here silently never existed on local SQLite installs, producing bugs
-    that looked unrelated to migrations (missing fields, 500s on save) —
-    this was called out as a known gap in project notes. Now each
-    migration is parsed into (table, column, coltype); on SQLite we check
-    PRAGMA table_info for the column first and run a plain
-    `ALTER TABLE ... ADD COLUMN ...` (which SQLite does support) only when
-    it's actually missing. PostgreSQL keeps using the original
-    IF-NOT-EXISTS statements directly, since those already work there.
+    On PostgreSQL, `ADD COLUMN IF NOT EXISTS` is used directly. On SQLite,
+    which doesn't support that syntax, each migration is parsed into
+    (table, column, coltype); PRAGMA table_info is checked first and a
+    plain `ALTER TABLE ... ADD COLUMN ...` runs only when the column is
+    actually missing.
     """
     from sqlalchemy import text
     from database import SessionLocal, db_url
@@ -231,7 +242,9 @@ app = FastAPI(
     description=(
         "Automated school timetable generator — constraint-based scheduling, "
         "multi-draft generation, static slot locking, drag-and-drop editing, "
-        "real-time WebSocket updates, PDF export & email delivery."
+        "real-time WebSocket updates, PDF export & email delivery. Also "
+        "includes a secondary personal timetable module and plan-based "
+        "pricing for home/office and school users."
     ),
     docs_url="/docs",
     redoc_url="/redoc",
@@ -268,6 +281,8 @@ app.include_router(supervisors.router,       prefix="",  tags=["Supervisors"])
 app.include_router(import_export.router,     prefix="",  tags=["Import/Export"])
 app.include_router(exam_layouts.router,      prefix="",  tags=["Exam Layout Templates"])
 app.include_router(timetable_layouts.router, prefix="",  tags=["Timetable Layout Templates"])
+app.include_router(personal_timetable.router,prefix="",  tags=["Personal Timetables"])
+app.include_router(billing.router,           prefix="",  tags=["Billing & Plans"])
 app.include_router(websockets.router, tags=["WebSockets"])
 
 
@@ -283,10 +298,15 @@ def ping():
 
 
 @app.get("/debug/status", tags=["Health"])
-def debug_status():
+def debug_status(_user=Depends(get_current_user)):
     """
-    Public endpoint — shows backend status without auth.
-    Visit https://your-app.onrender.com/debug/status to verify the backend is running.
+    HARDENING: this endpoint used to have no auth at all — anyone who found
+    the URL could see the Python version, whether the database is reachable,
+    the total user count, and whether an 'admin' account exists (useful
+    recon for a credential-stuffing attempt against the known demo admin
+    password). It now requires a valid logged-in token, same as any other
+    account-scoped endpoint — any authenticated user can still use it to
+    sanity-check their own deployment, but it's no longer public recon.
     """
     import sys
     from database import db_url, is_sqlite
@@ -314,11 +334,6 @@ def debug_status():
         "db_error":     db_error,
         "users":        user_count,
         "admin_exists": admin_exists,
-        "hint": (
-            "Backend running ✅ — try logging in with admin/admin123"
-            if admin_exists else
-            "No admin user found — check Render logs for seed errors"
-        ),
     }
 
 

@@ -1,34 +1,16 @@
 import axios from 'axios'
 
 // ── API base URL resolution ───────────────────────────────────────────────────
-// Priority (first match wins):
-//   1. VITE_API_URL  — build-time env var (set in Render → Environment)
-//   2. window.SSTG_API_URL — runtime override (injectable without rebuild)
-//   3. Same-origin  — local dev via Vite proxy (/api → localhost:8000)
-//
-// HOW TO SET ON RENDER:
-//   In your *frontend* service → Environment → add:
-//     VITE_API_URL = https://<your-backend-service-name>.onrender.com
-//   e.g. VITE_API_URL = https://smartadmin-sxvh.onrender.com
-//   Then trigger a redeploy of the frontend service.
-
 function resolveBaseURL() {
-  // 1. Build-time env var — explicit override (still supported if needed)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/$/, '')
   }
-
-  // 2. Runtime window override — injectable without rebuild
   if (typeof window !== 'undefined' && window.SSTG_API_URL) {
     return window.SSTG_API_URL.replace(/\/$/, '')
   }
-
-  // 3. Local dev via Vite proxy: /api → http://localhost:8000 (strips /api prefix)
   if (import.meta.env.DEV) {
     return '/api'
   }
-
-  // 4. Production (served by FastAPI on same origin): use empty string
   return ''
 }
 
@@ -47,15 +29,13 @@ if (import.meta.env.DEV) {
 
 const api = axios.create({ baseURL: BASE })
 
-// Attach JWT to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('sstg_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// On 401 clear token — but only redirect if we are on a protected page
-const PUBLIC_PATHS = ['/', '/login', '/signup']
+const PUBLIC_PATHS = ['/', '/login', '/signup', '/pricing']
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -144,7 +124,6 @@ export const schedulesAPI = {
 
 // ── Exams ─────────────────────────────────────────────────────────────────────
 export const examsAPI = {
-  // Sessions
   listSessions:    ()           => api.get('/exams/sessions'),
   getSession:      (id)         => api.get(`/exams/sessions/${id}`),
   createSession:   (data)       => api.post('/exams/sessions', data),
@@ -154,14 +133,12 @@ export const examsAPI = {
   generateSlots:   (id, data)   => api.post(`/exams/sessions/${id}/generate`, data),
   setSessionLayout:(id, layoutId) => api.put(`/exams/sessions/${id}/layout`, null, { params: { layout_id: layoutId || undefined } }),
 
-  // Papers
   allPapers:       ()                    => api.get('/exams/papers'),
   subjectPapers:   (subjectId)           => api.get(`/exams/subjects/${subjectId}/papers`),
   addPaper:        (subjectId, data)     => api.post(`/exams/subjects/${subjectId}/papers`, data),
   updatePaper:     (paperId, data)       => api.put(`/exams/papers/${paperId}`, data),
   deletePaper:     (paperId)             => api.delete(`/exams/papers/${paperId}`),
 
-  // Slots
   createSlot:      (sessionId, data)     => api.post(`/exams/sessions/${sessionId}/slots`, data),
   updateSlot:      (slotId, data)        => api.put(`/exams/slots/${slotId}`, data),
   deleteSlot:      (slotId)              => api.delete(`/exams/slots/${slotId}`),
@@ -288,7 +265,6 @@ export const educationSystemsAPI = {
 
 // ── Export ────────────────────────────────────────────────────────────────────
 export const exportAPI = {
-  // layoutId is optional — omit to use the draft's pinned template or the org default
   draftPdf:    (draft_id, layoutId = null) =>
                  api.get(`/export/draft/${draft_id}/pdf`,  { responseType: 'blob', params: layoutId ? { layout_id: layoutId } : {} }),
   draftXlsx:   (draft_id) =>
@@ -299,9 +275,27 @@ export const exportAPI = {
                  api.get(`/export/teacher/${teacher_id}/pdf?draft_id=${draft_id}`, { responseType: 'blob' }),
   emailTeacher:(teacher_id, draft_id, custom_message = '') =>
                  api.post('/export/email/teacher', { teacher_id, draft_id, custom_message }),
-  // layoutId is optional — omit to use the session's pinned template or the org default
   examPdf:     (session_id, layoutId = null) =>
                  api.get(`/export/exam/${session_id}/pdf`,  { responseType: 'blob', params: layoutId ? { layout_id: layoutId } : {} }),
   examXlsx:    (session_id, layoutId = null) =>
                  api.get(`/export/exam/${session_id}/xlsx`, { responseType: 'blob', params: layoutId ? { layout_id: layoutId } : {} }),
+}
+
+// ── Personal Timetables (home/office secondary feature) ────────────────────────
+export const personalTimetableAPI = {
+  list:        ()               => api.get('/personal-timetables'),
+  get:         (id)             => api.get(`/personal-timetables/${id}`),
+  create:      (data)           => api.post('/personal-timetables', data),
+  update:      (id, data)       => api.put(`/personal-timetables/${id}`, data),
+  delete:      (id)             => api.delete(`/personal-timetables/${id}`),
+  addBlock:    (timetableId, data) => api.post(`/personal-timetables/${timetableId}/blocks`, data),
+  updateBlock: (blockId, data)  => api.put(`/personal-blocks/${blockId}`, data),
+  deleteBlock: (blockId)        => api.delete(`/personal-blocks/${blockId}`),
+}
+
+// ── Billing & Plans ──────────────────────────────────────────────────────────
+export const billingAPI = {
+  plans:          ()     => api.get('/billing/plans'),
+  mySubscription: ()     => api.get('/billing/my-subscription'),
+  subscribe:      (data) => api.post('/billing/subscribe', data),
 }

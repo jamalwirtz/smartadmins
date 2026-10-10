@@ -6,6 +6,7 @@ Uses:
   bcrypt>=4.2.0   — direct password hashing (passlib dropped: broken on 3.13+)
   PyJWT>=2.9.0    — JWT encode/decode      (python-jose dropped: unmaintained, CVEs)
 """
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -20,15 +21,39 @@ from sqlalchemy.orm import Session
 from config import get_settings
 from database import get_db
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+_DEFAULT_SECRET = "change-me-run-openssl-rand-hex-32"
+
+if settings.SECRET_KEY == _DEFAULT_SECRET:
+    # HARDENING: this used to fail silently — the app would start and sign
+    # real JWTs with a secret published in this repo's own source code,
+    # meaning anyone who read config.py could forge a valid admin token.
+    # This doesn't block startup (so local dev / first run still works) but
+    # makes the risk impossible to miss in logs.
+    logger.warning(
+        "=" * 70 + "\n"
+        "SECURITY WARNING: SECRET_KEY is still the default placeholder.\n"
+        "Every JWT this server issues can be forged by anyone who has read\n"
+        "the source code. Set a real SECRET_KEY (e.g. `openssl rand -hex 32`)\n"
+        "as an environment variable before using this in production.\n"
+        + "=" * 70
+    )
 
 
 # ── Password hashing (bcrypt direct) ─────────────────────────────────────────
 
+# Rounds pinned explicitly at 12 — bcrypt's own default is also 12, but
+# pinning it here documents that this is a deliberate choice (cost factor
+# directly trades login latency for brute-force resistance) rather than an
+# accident of whatever the installed bcrypt version defaults to.
+_BCRYPT_ROUNDS = 12
+
 def hash_password(plain: str) -> str:
     """Hash a plaintext password using bcrypt. Returns a UTF-8 string."""
-    salt = bcrypt.gensalt(rounds=12)
+    salt = bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)
     return bcrypt.hashpw(plain.encode("utf-8"), salt).decode("utf-8")
 
 
