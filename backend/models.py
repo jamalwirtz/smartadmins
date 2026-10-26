@@ -5,6 +5,11 @@ Python 3.14 compatibility note:
   datetime.utcnow() is deprecated since Python 3.12 and emits DeprecationWarning.
   All timestamps now use `datetime.now(timezone.utc)` (timezone-aware UTC).
   SQLAlchemy's `func.now()` is used for server-side timestamps in production.
+
+BATCH 1 CHANGE: ExamSlot gained `exam_date` (real calendar date) so an exam
+session can span several weeks. The old unique constraint (session, class,
+day-NAME, period) made week 2 collide with week 1; it is replaced by
+(session, class, exam_date, period). main.py migrates existing databases.
 """
 import json
 import uuid
@@ -178,12 +183,16 @@ class ExamPaper(Base):
 
 class ExamSlot(Base):
     """
-    A scheduled exam session — one paper, one class, one time slot.
+    A scheduled exam sitting — one paper, one class, one date + period.
+
+    `day` keeps the weekday NAME ("Monday") for display and for older code;
+    `exam_date` is the real calendar date ("2026-10-19") and is what makes
+    multi-week exam sessions possible. Legacy rows have exam_date = NULL.
     """
     __tablename__ = "exam_slots"
     __table_args__ = (
         UniqueConstraint("exam_session_id", "class_id", "paper_id", name="uq_exam_slot"),
-        UniqueConstraint("exam_session_id", "class_id", "day", "period", name="uq_exam_time"),
+        UniqueConstraint("exam_session_id", "class_id", "exam_date", "period", name="uq_exam_date_time"),
     )
 
     id               = Column(String(36), primary_key=True, default=_uuid)
@@ -191,6 +200,7 @@ class ExamSlot(Base):
     paper_id         = Column(String(36), ForeignKey("exam_papers.id", ondelete="CASCADE"), nullable=False)
     class_id         = Column(String(36), ForeignKey("class_sections.id", ondelete="CASCADE"), nullable=False)
     day              = Column(String(12), nullable=False)
+    exam_date        = Column(String(10), nullable=True)   # "2026-10-19"
     period           = Column(Integer, nullable=False)
     invigilator_id   = Column(String(36), ForeignKey("supervisors.id", ondelete="SET NULL"), nullable=True)
     room             = Column(String(80), nullable=True)  # e.g., "Science Lab", "Hall A"

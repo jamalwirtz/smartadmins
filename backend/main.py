@@ -16,7 +16,7 @@ import models  # noqa: registers all ORM models
 import personal_timetable  # noqa: registers PersonalTimetable/PersonalEvent models
 import billing             # noqa: registers Subscription model
 
-import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings, allocations, education_systems, rooms, supervisors, import_export, exam_layouts, timetable_layouts
+import auth, teachers, subjects, classes, schedules, exports, exams, templates_api, ai_scheduler, holidays, school_settings, allocations, education_systems, rooms, supervisors, import_export, exam_resources, exam_layouts, timetable_layouts
 import ws_routes as websockets
 from security import get_current_user
 
@@ -27,8 +27,7 @@ settings = get_settings()
 Base.metadata.create_all(bind=engine)
 
 # HARDENING: a wildcard CORS origin is a common accidental production
-# footgun — it's fine for a demo/public API with no cookies, but worth
-# surfacing loudly in logs so it's a deliberate choice, not an oversight.
+# footgun — worth surfacing loudly in logs so it's a deliberate choice.
 if settings.cors_origins_list == ["*"]:
     logger.warning(
         "CORS_ORIGINS is '*' — any website can call this API from a "
@@ -147,8 +146,9 @@ _MIGRATIONS = [
     "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_phone VARCHAR(40)",
     "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS school_address VARCHAR(300)",
     "ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS timetable_orientation VARCHAR(12) DEFAULT 'horizontal'",
-    # ExamSlot new column
+    # ExamSlot new columns
     "ALTER TABLE exam_slots ADD COLUMN IF NOT EXISTS room_id VARCHAR(36)",
+    "ALTER TABLE exam_slots ADD COLUMN IF NOT EXISTS exam_date VARCHAR(10)",
     # TimetableSlot new columns for special events
     "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS slot_type VARCHAR(30) DEFAULT 'lesson'",
     "ALTER TABLE timetable_slots ADD COLUMN IF NOT EXISTS event_label VARCHAR(80)",
@@ -174,9 +174,7 @@ _MIGRATIONS = [
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS description VARCHAR(300)",
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS icon VARCHAR(8)",
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS accent_color VARCHAR(7)",
-    # NEW: billing — Subscription status/cycle columns in case an older row
-    # exists without them (table itself is created fresh by create_all, but
-    # this keeps the pattern consistent if the model gains fields later)
+    # Billing
     "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'",
     "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR(10) DEFAULT 'monthly'",
 ]
@@ -195,28 +193,84 @@ def _sqlite_column_exists(db, table: str, column: str) -> bool:
         return True
 
 
+def _migrate_exam_slot_constraint(is_pg: bool):
+    """
+    Swap the old unique rule (session, class, weekday-NAME, period) for
+    (session, class, exam_date, period). Without this, week 2 of a multi-week
+    exam session collides with week 1 and the insert fails.
+
+    PostgreSQL: drop the old constraint, add the new one (each in its own
+                transaction so one failure can't abort the others).
+    SQLite:     cannot drop constraints, so the table is rebuilt — only when
+                the old constraint is still present — preserving every row.
+    """
+    from sqlalchemy import text
+    try:
+        if is_pg:
+            for sql in (
+                "ALTER TABLE exam_slots DROP CONSTRAINT IF EXISTS uq_exam_time",
+                "ALTER TABLE exam_slots ADD CONSTRAINT uq_exam_date_time "
+                "UNIQUE (exam_session_id, class_id, exam_date, period)",
+            ):
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(sql))
+                except Exception:
+                    pass  # already applied
+            return
+
+        with engine.begin() as conn:
+            row = conn.execute(text(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='exam_slots'"
+            )).fetchone()
+            if not row or "uq_exam_time" not in (row[0] or ""):
+                return
+            old_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(exam_slots)")).fetchall()]
+            conn.execute(text("ALTER TABLE exam_slots RENAME TO exam_slots_old"))
+        try:
+            models.ExamSlot.__table__.create(bind=engine)
+            new_cols = [c.name for c in models.ExamSlot.__table__.columns]
+            shared = ", ".join(c for c in old_cols if c in new_cols)
+            with engine.begin() as conn:
+                conn.execute(text(f"INSERT INTO exam_slots ({shared}) SELECT {shared} FROM exam_slots_old"))
+                conn.execute(text("DROP TABLE exam_slots_old"))
+        except Exception:
+            # Put the original table back so no exam data is ever lost.
+            with engine.begin() as conn:
+                conn.execute(text("DROP TABLE IF EXISTS exam_slots"))
+                conn.execute(text("ALTER TABLE exam_slots_old RENAME TO exam_slots"))
+            raise
+        print("[boot] exam_slots rebuilt with date-aware unique constraint ✅")
+    except Exception as e:
+        print(f"[boot] exam_slots constraint migration note: {e}")
+
+
 def _run_migrations():
     """
-    Idempotent ALTER TABLE runner — dialect-aware (see note below).
+    Idempotent ALTER TABLE runner — dialect-aware.
 
-    On PostgreSQL, `ADD COLUMN IF NOT EXISTS` is used directly. On SQLite,
-    which doesn't support that syntax, each migration is parsed into
-    (table, column, coltype); PRAGMA table_info is checked first and a
-    plain `ALTER TABLE ... ADD COLUMN ...` runs only when the column is
-    actually missing.
+    PostgreSQL: each statement runs in its own transaction, so one failure
+    (e.g. a column that already exists) no longer aborts the rest of the
+    batch — previously a single failed statement could silently skip every
+    migration after it.
+    SQLite: PRAGMA table_info is checked first and a plain ADD COLUMN runs
+    only when the column is missing.
     """
     from sqlalchemy import text
     from database import SessionLocal, db_url
-    db = SessionLocal()
     is_pg = 'postgresql' in db_url
-    try:
+
+    if is_pg:
         for sql in _MIGRATIONS:
-            if is_pg:
-                try:
-                    db.execute(text(sql))
-                except Exception:
-                    pass  # column may already exist
-            else:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(sql))
+            except Exception:
+                pass
+    else:
+        db = SessionLocal()
+        try:
+            for sql in _MIGRATIONS:
                 m = _ALTER_RE.match(sql)
                 if not m:
                     continue
@@ -226,12 +280,14 @@ def _run_migrations():
                         db.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
                     except Exception:
                         pass
-        db.commit()
-        print(f"[boot] DB migrations applied ✅ ({'postgres' if is_pg else 'sqlite'})")
-    except Exception as e:
-        print(f"[boot] Migration note: {e}")
-    finally:
-        db.close()
+            db.commit()
+        except Exception as e:
+            print(f"[boot] Migration note: {e}")
+        finally:
+            db.close()
+
+    _migrate_exam_slot_constraint(is_pg)
+    print(f"[boot] DB migrations applied ✅ ({'postgres' if is_pg else 'sqlite'})")
 
 _run_migrations()
 
@@ -279,6 +335,7 @@ app.include_router(education_systems.router, prefix="",  tags=["Education System
 app.include_router(rooms.router,             prefix="",  tags=["Rooms"])
 app.include_router(supervisors.router,       prefix="",  tags=["Supervisors"])
 app.include_router(import_export.router,     prefix="",  tags=["Import/Export"])
+app.include_router(exam_resources.router,    prefix="",  tags=["Exam Resources"])
 app.include_router(exam_layouts.router,      prefix="",  tags=["Exam Layout Templates"])
 app.include_router(timetable_layouts.router, prefix="",  tags=["Timetable Layout Templates"])
 app.include_router(personal_timetable.router,prefix="",  tags=["Personal Timetables"])
@@ -300,13 +357,8 @@ def ping():
 @app.get("/debug/status", tags=["Health"])
 def debug_status(_user=Depends(get_current_user)):
     """
-    HARDENING: this endpoint used to have no auth at all — anyone who found
-    the URL could see the Python version, whether the database is reachable,
-    the total user count, and whether an 'admin' account exists (useful
-    recon for a credential-stuffing attempt against the known demo admin
-    password). It now requires a valid logged-in token, same as any other
-    account-scoped endpoint — any authenticated user can still use it to
-    sanity-check their own deployment, but it's no longer public recon.
+    HARDENING: requires a valid logged-in token (it used to be public recon:
+    Python version, DB reachability, user count, whether 'admin' exists).
     """
     import sys
     from database import db_url, is_sqlite
