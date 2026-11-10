@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from security import get_current_user
+from levels import same_level
 from models import (
     ExamSession, ExamPaper, ExamSlot, ClassAllocation,
     Subject, ClassSection, Supervisor, Room, User,
@@ -560,7 +561,7 @@ def _build_plan(session: ExamSession, req: GenerateRequest, db: Session, ignore_
         if cls.id in allocated:
             return subj.id in allocated[cls.id]
         # 2) Otherwise match on grade/level label (case-insensitive) and curriculum.
-        if _norm(subj.grade_level) != _norm(cls.grade_level):
+        if not same_level(subj.grade_level, cls.grade_level):
             return False
         if cls.education_system_id and subj.education_system_id \
                 and cls.education_system_id != subj.education_system_id:

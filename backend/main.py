@@ -174,6 +174,8 @@ _MIGRATIONS = [
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS description VARCHAR(300)",
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS icon VARCHAR(8)",
     "ALTER TABLE timetable_layout_templates ADD COLUMN IF NOT EXISTS accent_color VARCHAR(7)",
+    # Personal timetables: who is responsible for a block
+    "ALTER TABLE personal_events ADD COLUMN IF NOT EXISTS assignee VARCHAR(60)",
     # Billing
     "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'",
     "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR(10) DEFAULT 'monthly'",

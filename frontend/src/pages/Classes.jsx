@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -19,8 +19,13 @@ const STEPS = [
   { id: 4, label: 'Done',                 icon: <Check     size={14}/> },
 ]
 
-const GRADES = ['1','2','3','4','5','6','7','8','9','10','11','12',
-                'S1','S2','S3','S4','S5','S6','Form 1','Form 2','Form 3','Form 4']
+// Only SUGGESTIONS — the field is free text, so any naming works
+// ("Primary 4", "Year 9", "Form 2", "Std 7", "Nursery"…).
+const COMMON_LEVELS = ['1','2','3','4','5','6','7','8','9','10','11','12',
+                       'S1','S2','S3','S4','S5','S6','Form 1','Form 2','Form 3','Form 4']
+
+// "7" → "Grade 7"; anything the admin typed themselves is shown exactly as typed
+const gradeLabel = (g) => (/^\d+$/.test(String(g || '').trim()) ? `Grade ${g}` : g)
 
 // ── Wizard step indicator ─────────────────────────────────────────────────────
 function StepBar({ current }) {
@@ -45,45 +50,37 @@ export default function Classes() {
   const [classes,   setClasses]   = useState([])
   const [subjects,  setSubjects]  = useState([])
   const [teachers,  setTeachers]  = useState([])
-  const [systems,   setSystems]   = useState([])   // curricula for the class-level picker
-  const [allocs,    setAllocs]    = useState({})   // {classId: allocations[]}
+  const [systems,   setSystems]   = useState([])
+  const [allocs,    setAllocs]    = useState({})
   const [loading,   setLoading]   = useState(true)
 
-  // Wizard state
   const [wizardOpen,  setWizardOpen]  = useState(false)
   const [step,        setStep]        = useState(1)
   const [editingId,   setEditingId]   = useState(null)
   const [saving,      setSaving]      = useState(false)
 
-  // Step 1 — class details
   const [classForm, setClassForm] = useState({
     name:'', grade_level:'', stream:'', capacity:40, max_subjects_per_day:8,
     education_system_id: ''
   })
 
-  // Step 2 — subjects
   const [selectedSubjects, setSelectedSubjects] = useState([])
   const [subSearch,        setSubSearch]        = useState('')
+  const [showAllSubjects,  setShowAllSubjects]  = useState(false)
   const [newSubjectName,   setNewSubjectName]   = useState('')
   const [newSubjectCode,   setNewSubjectCode]   = useState('')
   const [addingSubject,    setAddingSubject]     = useState(false)
   const [creatingSubject,  setCreatingSubject]   = useState(false)
 
-  // Step 3 — teacher assignment
-  const [teacherMap, setTeacherMap] = useState({})  // {subjectId: teacherId|''}
-
-  // Step 4 — result
+  const [teacherMap, setTeacherMap] = useState({})
   const [saveResult, setSaveResult] = useState(null)
 
-  // Search
   const [classSearch, setClassSearch] = useState('')
-  // Inline teacher creation (step 3)
   const [addingTeacher,   setAddingTeacher]   = useState(false)
   const [newTeacherName,  setNewTeacherName]  = useState('')
   const [newTeacherEmail, setNewTeacherEmail] = useState('')
   const [creatingTeacher, setCreatingTeacher] = useState(false)
 
-  // Bulk import
   const importInputRef = useRef()
   const [importing, setImporting] = useState(false)
 
@@ -96,7 +93,6 @@ export default function Classes() {
       ])
       setClasses(c.data); setSubjects(s.data); setTeachers(t.data)
 
-      // Load allocations for each class
       const allocMap = {}
       await Promise.all(c.data.map(async cls => {
         try {
@@ -114,7 +110,16 @@ export default function Classes() {
     curriculumAPI.list().then(r => setSystems(r.data)).catch(() => {})
   }, [])
 
-  // ── Bulk import — CSV or .xlsx, same fields as the wizard's Step 1 ────────
+  // Level-name suggestions: the chosen curriculum's own levels first, then anything
+  // already used by classes/subjects in this school, then common names.
+  const levelSuggestions = useMemo(() => {
+    const sys = systems.find(s => s.id === classForm.education_system_id)
+    const fromSystem = (sys?.levels || '').split(',').map(x => x.trim()).filter(Boolean)
+    const used = [...classes.map(c => c.grade_level), ...subjects.map(s => s.grade_level)]
+    return [...new Set([...fromSystem, ...used, ...COMMON_LEVELS].filter(Boolean))]
+  }, [systems, classForm.education_system_id, classes, subjects])
+
+  // ── Bulk import ───────────────────────────────────────────────────────────
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -124,17 +129,12 @@ export default function Classes() {
       toast.success(r.data.message, { duration: 5000 })
       if (r.data.errors?.length) {
         r.data.errors.slice(0, 5).forEach(err => toast.error(err, { duration: 6000 }))
-        if (r.data.errors.length > 5) {
-          toast(`+${r.data.errors.length - 5} more row(s) skipped`, { icon: 'ℹ️' })
-        }
+        if (r.data.errors.length > 5) toast(`+${r.data.errors.length - 5} more row(s) skipped`, { icon: 'ℹ️' })
       }
       load()
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Import failed')
-    } finally {
-      setImporting(false)
-      e.target.value = ''
-    }
+    } finally { setImporting(false); e.target.value = '' }
   }
 
   // ── Wizard helpers ────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export default function Classes() {
     setStep(1); setEditingId(null)
     setClassForm({ name:'', grade_level:'', stream:'', capacity:40, max_subjects_per_day:8, education_system_id:'' })
     setSelectedSubjects([]); setTeacherMap({})
-    setSaveResult(null); setSubSearch('')
+    setSaveResult(null); setSubSearch(''); setShowAllSubjects(false)
     setNewSubjectName(''); setNewSubjectCode('')
     setAddingSubject(false)
   }
@@ -169,17 +169,15 @@ export default function Classes() {
   // ── Step 1: Save class ────────────────────────────────────────────────────
   const saveClass = async () => {
     if (!classForm.name.trim())        { toast.error('Class name is required'); return }
-    if (!classForm.grade_level.trim()) { toast.error('Grade level is required'); return }
+    if (!classForm.grade_level.trim()) { toast.error('Enter the level this class belongs to (any name you use)'); return }
     setSaving(true)
     try {
-      let cls
+      const body = { ...classForm, name: classForm.name.trim(), grade_level: classForm.grade_level.trim() }
       if (editingId) {
-        await classesAPI.update(editingId, classForm)
-        cls = { id: editingId, ...classForm }
+        await classesAPI.update(editingId, body)
       } else {
-        const r = await classesAPI.create(classForm)
-        cls = r.data
-        setEditingId(cls.id)
+        const r = await classesAPI.create(body)
+        setEditingId(r.data.id)
       }
       toast.success(editingId ? 'Class updated ✅' : 'Class created ✅')
       setStep(2)
@@ -250,7 +248,13 @@ export default function Classes() {
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const filteredSubjects = subjects.filter(s =>
+  const norm = (v) => String(v || '').toLowerCase().replace(/\b(grade|form|class|year|std|standard|level)\b/g, ' ').replace(/[\s\-_]+/g, '')
+  const sameLevel = (a, b) => norm(a) === norm(b)
+
+  // By default show subjects for this class's level (flexible match); "show all" lifts the filter
+  const levelSubjects = subjects.filter(s => sameLevel(s.grade_level, classForm.grade_level))
+  const pool = (showAllSubjects || levelSubjects.length === 0) ? subjects : levelSubjects
+  const filteredSubjects = pool.filter(s =>
     s.name.toLowerCase().includes(subSearch.toLowerCase()) ||
     (s.subject_code||'').toLowerCase().includes(subSearch.toLowerCase())
   )
@@ -266,7 +270,6 @@ export default function Classes() {
   return (
     <div className="page-container">
 
-      {/* ── Page header ── */}
       <motion.div className="page-header" initial={{opacity:0,y:-16}} animate={{opacity:1,y:0}}>
         <div>
           <h1 className="page-title">Classes</h1>
@@ -295,7 +298,6 @@ export default function Classes() {
         </div>
       </motion.div>
 
-      {/* ── Wizard modal ── */}
       <AnimatePresence>
         {wizardOpen && (
           <motion.div className="wizard-backdrop"
@@ -306,21 +308,17 @@ export default function Classes() {
               animate={{opacity:1,scale:1,y:0}}
               exit={{opacity:0,scale:.95,y:20}}>
 
-              {/* Modal header */}
               <div className="wizard-header">
                 <div>
-                  <h2 className="wizard-title">
-                    {editingId ? 'Edit Class' : 'Create New Class'}
-                  </h2>
+                  <h2 className="wizard-title">{editingId ? 'Edit Class' : 'Create New Class'}</h2>
                   <p className="wizard-sub">
-                    {step===1 && 'Enter class details'}
+                    {step===1 && 'Name the class and the level it belongs to — use whatever names your school uses'}
                     {step===2 && 'Choose subjects for this class'}
                     {step===3 && 'Assign teachers — leave blank to save as pending'}
                     {step===4 && 'Setup complete'}
                   </p>
                 </div>
-                <button className="wizard-close"
-                  onClick={() => { setWizardOpen(false); resetWizard() }}>
+                <button className="wizard-close" onClick={() => { setWizardOpen(false); resetWizard() }}>
                   <X size={18}/>
                 </button>
               </div>
@@ -329,24 +327,26 @@ export default function Classes() {
 
               <div className="wizard-body">
 
-                {/* ── STEP 1: Class Details ── */}
                 {step === 1 && (
-                  <motion.div className="wizard-step-content"
-                    initial={{opacity:0,x:20}} animate={{opacity:1,x:0}}>
+                  <motion.div className="wizard-step-content" initial={{opacity:0,x:20}} animate={{opacity:1,x:0}}>
                     <div className="wizard-form-grid">
                       <div className="wiz-field">
                         <label className="wiz-label">Class Name <span className="wiz-req">*</span></label>
                         <input className="wiz-input" value={classForm.name} autoFocus
                           onChange={e=>setClassForm(f=>({...f,name:e.target.value}))}
-                          placeholder="e.g. 7A, 8 Blue, Form 3" />
+                          placeholder="e.g. 7A, Primary 4 Blue, Form 3 Science" />
                       </div>
                       <div className="wiz-field">
-                        <label className="wiz-label">Grade Level <span className="wiz-req">*</span></label>
-                        <select className="wiz-select" value={classForm.grade_level}
-                          onChange={e=>setClassForm(f=>({...f,grade_level:e.target.value}))}>
-                          <option value="">Select grade ▼</option>
-                          {GRADES.map(g=><option key={g} value={g}>Grade {g}</option>)}
-                        </select>
+                        <label className="wiz-label">Level / Grade <span className="wiz-req">*</span></label>
+                        <input className="wiz-input" list="level-suggestions" value={classForm.grade_level}
+                          onChange={e=>setClassForm(f=>({...f,grade_level:e.target.value}))}
+                          placeholder="Pick a suggestion or type your own" />
+                        <datalist id="level-suggestions">
+                          {levelSuggestions.map(l => <option key={l} value={l} />)}
+                        </datalist>
+                        <span style={{fontSize:10.5,color:'var(--muted)',marginTop:3,display:'block'}}>
+                          Any name works. Subjects with the same level ("8" and "Grade 8" count as the same) are suggested for this class.
+                        </span>
                       </div>
                       <div className="wiz-field">
                         <label className="wiz-label">Stream / Section</label>
@@ -374,8 +374,7 @@ export default function Classes() {
                           {systems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                         <span style={{fontSize:10.5,color:'var(--muted)',marginTop:3,display:'block'}}>
-                          Timetable generation only matches this class with subjects from the same curriculum
-                          (or subjects with no curriculum tag). Leave blank to match by grade level only.
+                          Optional. Picking one also fills the level suggestions with that curriculum's levels.
                         </span>
                       </div>
                     </div>
@@ -387,56 +386,59 @@ export default function Classes() {
                   </motion.div>
                 )}
 
-                {/* ── STEP 2: Subject Selection ── */}
                 {step === 2 && (
-                  <motion.div className="wizard-step-content"
-                    initial={{opacity:0,x:20}} animate={{opacity:1,x:0}}>
-                    <div style={{position:'relative',marginBottom:14}}>
+                  <motion.div className="wizard-step-content" initial={{opacity:0,x:20}} animate={{opacity:1,x:0}}>
+                    <div style={{position:'relative',marginBottom:10}}>
                       <Search size={14} style={{position:'absolute',left:10,top:'50%',
                         transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}}/>
                       <input className="wiz-input" style={{paddingLeft:34}}
-                        value={subSearch}
-                        onChange={e=>setSubSearch(e.target.value)}
+                        value={subSearch} onChange={e=>setSubSearch(e.target.value)}
                         placeholder="Search subjects…"/>
                     </div>
+                    {levelSubjects.length > 0 && (
+                      <div style={{fontSize:12,color:'var(--muted)',marginBottom:10}}>
+                        Showing {showAllSubjects ? 'all subjects' : `subjects for "${classForm.grade_level}"`}.{' '}
+                        <a href="#" onClick={e=>{e.preventDefault();setShowAllSubjects(v=>!v)}}>
+                          {showAllSubjects ? 'Show only this level' : 'Show every subject'}
+                        </a>
+                      </div>
+                    )}
+                    {levelSubjects.length === 0 && subjects.length > 0 && (
+                      <div className="wiz-info-banner" style={{marginBottom:10}}>
+                        <AlertCircle size={14}/>
+                        <span>No subjects are tagged with level "{classForm.grade_level}", so every subject is shown.
+                          Whatever you select here is what this class is scheduled for.</span>
+                      </div>
+                    )}
 
                     <div className="wiz-subject-grid">
                       {filteredSubjects.map(s=>(
                         <button key={s.id} type="button"
                           className={`wiz-subject-card${selectedSubjects.includes(s.id)?' selected':''}`}
-                          style={selectedSubjects.includes(s.id)
-                            ?{borderColor:s.color_hex,background:`${s.color_hex}18`}:{}}
-                          onClick={()=>setSelectedSubjects(p=>
-                            p.includes(s.id)?p.filter(x=>x!==s.id):[...p,s.id])}>
+                          style={selectedSubjects.includes(s.id)?{borderColor:s.color_hex,background:`${s.color_hex}18`}:{}}
+                          onClick={()=>setSelectedSubjects(p=>p.includes(s.id)?p.filter(x=>x!==s.id):[...p,s.id])}>
                           <div className="wiz-subject-dot" style={{background:s.color_hex||'#6366f1'}}/>
                           <span className="wiz-subject-name">{s.name}</span>
                           {s.subject_code && <span className="wiz-subject-code">{s.subject_code}</span>}
-                          {selectedSubjects.includes(s.id)&&(
-                            <span className="wiz-subject-check"><Check size={11}/></span>
-                          )}
+                          {selectedSubjects.includes(s.id)&&(<span className="wiz-subject-check"><Check size={11}/></span>)}
                         </button>
                       ))}
                     </div>
 
-                    {/* Create new subject inline */}
                     {!addingSubject ? (
                       <button className="wiz-add-btn" onClick={()=>setAddingSubject(true)}>
                         <Plus size={14}/> Create New Subject
                       </button>
                     ) : (
-                      <motion.div className="wiz-new-subject"
-                        initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}>
+                      <motion.div className="wiz-new-subject" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}>
                         <div className="wiz-new-subject-fields">
                           <input className="wiz-input" value={newSubjectName}
-                            onChange={e=>setNewSubjectName(e.target.value)}
-                            placeholder="Subject Name *" autoFocus/>
+                            onChange={e=>setNewSubjectName(e.target.value)} placeholder="Subject Name *" autoFocus/>
                           <input className="wiz-input" value={newSubjectCode}
-                            onChange={e=>setNewSubjectCode(e.target.value)}
-                            placeholder="Code (optional, e.g. MATH01)"/>
+                            onChange={e=>setNewSubjectCode(e.target.value)} placeholder="Code (optional, e.g. MATH01)"/>
                         </div>
                         <div style={{display:'flex',gap:8,marginTop:8}}>
-                          <button className="btn btn-accent btn-sm" disabled={creatingSubject}
-                            onClick={createSubjectInline}>
+                          <button className="btn btn-accent btn-sm" disabled={creatingSubject} onClick={createSubjectInline}>
                             {creatingSubject?'Creating…':<><Check size={13}/> Create & Select</>}
                           </button>
                           <button className="btn btn-secondary btn-sm"
@@ -452,24 +454,17 @@ export default function Classes() {
                     </div>
 
                     <div className="wizard-footer">
-                      <button className="btn btn-secondary" onClick={()=>setStep(1)}>
-                        <ChevronLeft size={15}/> Back
-                      </button>
+                      <button className="btn btn-secondary" onClick={()=>setStep(1)}><ChevronLeft size={15}/> Back</button>
                       <button className="btn btn-accent"
-                        onClick={()=>{
-                          if(!selectedSubjects.length){toast.error('Select at least one subject');return}
-                          setStep(3)
-                        }}>
+                        onClick={()=>{ if(!selectedSubjects.length){toast.error('Select at least one subject');return}; setStep(3) }}>
                         Continue <ChevronRight size={15}/>
                       </button>
                     </div>
                   </motion.div>
                 )}
 
-                {/* ── STEP 3: Teacher Assignment ── */}
                 {step === 3 && (
-                  <motion.div className="wizard-step-content"
-                    initial={{opacity:0,x:20}} animate={{opacity:1,x:0}}>
+                  <motion.div className="wizard-step-content" initial={{opacity:0,x:20}} animate={{opacity:1,x:0}}>
                     <div className="wiz-info-banner">
                       <AlertCircle size={14}/>
                       <span>
@@ -486,30 +481,23 @@ export default function Classes() {
                         return (
                           <div key={sid} className={`wiz-teacher-row${hasTeacher?'':' pending'}`}>
                             <div className="wiz-teacher-subject">
-                              <div className="wiz-teacher-dot"
-                                style={{background:subj.color_hex||'#6366f1'}}/>
+                              <div className="wiz-teacher-dot" style={{background:subj.color_hex||'#6366f1'}}/>
                               <div>
                                 <div className="wiz-teacher-subj-name">{subj.name}</div>
-                                {subj.subject_code&&(
-                                  <div className="wiz-teacher-code">{subj.subject_code}</div>
-                                )}
+                                {subj.subject_code&&(<div className="wiz-teacher-code">{subj.subject_code}</div>)}
                               </div>
                             </div>
                             <ArrowRight size={14} style={{color:'var(--muted)',flexShrink:0}}/>
                             <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
-                              <select
-                                className="wiz-teacher-select"
-                                value={teacherMap[sid]||''}
+                              <select className="wiz-teacher-select" value={teacherMap[sid]||''}
                                 onChange={e=>setTeacherMap(m=>({...m,[sid]:e.target.value}))}>
                                 <option value="">— Leave Blank (Pending) —</option>
-                                {/* Teachers who teach this subject */}
                                 {teachers.filter(t=>(t.subject_ids||[]).includes(sid)).length > 0 && (
                                   <optgroup label="Assigned to this subject">
                                     {teachers.filter(t=>(t.subject_ids||[]).includes(sid))
                                       .map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
                                   </optgroup>
                                 )}
-                                {/* All other teachers as fallback */}
                                 {teachers.filter(t=>!(t.subject_ids||[]).includes(sid)).length > 0 && (
                                   <optgroup label="Other teachers">
                                     {teachers.filter(t=>!(t.subject_ids||[]).includes(sid))
@@ -517,20 +505,15 @@ export default function Classes() {
                                   </optgroup>
                                 )}
                               </select>
-                              {/* Inline teacher creation */}
                               {addingTeacher === sid ? (
-                                <div style={{display:'flex',flexDirection:'column',gap:6,
-                                  padding:10,background:'var(--surface-2)',borderRadius:8,
-                                  border:'1px solid var(--border)'}}>
+                                <div style={{display:'flex',flexDirection:'column',gap:6,padding:10,
+                                  background:'var(--surface-2)',borderRadius:8,border:'1px solid var(--border)'}}>
                                   <input className="wiz-input" value={newTeacherName} autoFocus
-                                    onChange={e=>setNewTeacherName(e.target.value)}
-                                    placeholder="Teacher full name *"/>
+                                    onChange={e=>setNewTeacherName(e.target.value)} placeholder="Teacher full name *"/>
                                   <input className="wiz-input" value={newTeacherEmail}
-                                    onChange={e=>setNewTeacherEmail(e.target.value)}
-                                    placeholder="Email (optional)"/>
+                                    onChange={e=>setNewTeacherEmail(e.target.value)} placeholder="Email (optional)"/>
                                   <div style={{display:'flex',gap:6}}>
-                                    <button className="btn btn-accent btn-sm" style={{flex:1}}
-                                      disabled={creatingTeacher}
+                                    <button className="btn btn-accent btn-sm" style={{flex:1}} disabled={creatingTeacher}
                                       onClick={()=>createTeacherInline(sid)}>
                                       {creatingTeacher?'Creating…':<><Check size={12}/>Create &amp; Assign</>}
                                     </button>
@@ -548,9 +531,7 @@ export default function Classes() {
                               )}
                             </div>
                             <div className={`wiz-teacher-status${hasTeacher?' assigned':' pending'}`}>
-                              {hasTeacher
-                                ? <><CheckCircle size={12}/> Assigned</>
-                                : <><Clock size={12}/> Pending</>}
+                              {hasTeacher ? <><CheckCircle size={12}/> Assigned</> : <><Clock size={12}/> Pending</>}
                             </div>
                           </div>
                         )
@@ -558,9 +539,7 @@ export default function Classes() {
                     </div>
 
                     <div className="wizard-footer">
-                      <button className="btn btn-secondary" onClick={()=>setStep(2)}>
-                        <ChevronLeft size={15}/> Back
-                      </button>
+                      <button className="btn btn-secondary" onClick={()=>setStep(2)}><ChevronLeft size={15}/> Back</button>
                       <button className="btn btn-accent" onClick={saveAllocations} disabled={saving}>
                         {saving?'Saving…':<><Check size={15}/> SAVE ALLOCATION</>}
                       </button>
@@ -568,27 +547,16 @@ export default function Classes() {
                   </motion.div>
                 )}
 
-                {/* ── STEP 4: Done ── */}
                 {step === 4 && saveResult && (
-                  <motion.div className="wizard-step-content"
-                    initial={{opacity:0,scale:.95}} animate={{opacity:1,scale:1}}
+                  <motion.div className="wizard-step-content" initial={{opacity:0,scale:.95}} animate={{opacity:1,scale:1}}
                     style={{textAlign:'center',padding:'32px 20px'}}>
-                    <motion.div
-                      initial={{scale:0}} animate={{scale:1}}
-                      transition={{type:'spring',stiffness:300,delay:.1}}
-                      style={{
-                        width:64,height:64,borderRadius:'50%',margin:'0 auto 20px',
-                        background:'rgba(74,222,128,.12)',
-                        display:'flex',alignItems:'center',justifyContent:'center',
-                      }}>
+                    <motion.div initial={{scale:0}} animate={{scale:1}} transition={{type:'spring',stiffness:300,delay:.1}}
+                      style={{width:64,height:64,borderRadius:'50%',margin:'0 auto 20px',background:'rgba(74,222,128,.12)',
+                        display:'flex',alignItems:'center',justifyContent:'center'}}>
                       <CheckCircle size={32} color="#16a34a"/>
                     </motion.div>
-                    <h3 style={{fontSize:20,fontWeight:800,color:'var(--text)',marginBottom:8}}>
-                      Setup Complete!
-                    </h3>
-                    <p style={{color:'var(--muted)',marginBottom:20,fontSize:14}}>
-                      {saveResult.message}
-                    </p>
+                    <h3 style={{fontSize:20,fontWeight:800,color:'var(--text)',marginBottom:8}}>Setup Complete!</h3>
+                    <p style={{color:'var(--muted)',marginBottom:20,fontSize:14}}>{saveResult.message}</p>
                     <div style={{display:'flex',gap:16,justifyContent:'center',flexWrap:'wrap'}}>
                       <div className="wiz-result-stat" style={{background:'rgba(74,222,128,.08)',border:'1px solid rgba(74,222,128,.2)'}}>
                         <span style={{fontSize:28,fontWeight:900,color:'#16a34a'}}>{saveResult.assigned_count}</span>
@@ -602,14 +570,8 @@ export default function Classes() {
                       )}
                     </div>
                     <div className="wizard-footer" style={{justifyContent:'center',marginTop:28}}>
-                      <button className="btn btn-secondary"
-                        onClick={()=>{resetWizard();setWizardOpen(false)}}>
-                        Close
-                      </button>
-                      <button className="btn btn-accent"
-                        onClick={()=>{resetWizard()}}>
-                        <Plus size={14}/> Add Another Class
-                      </button>
+                      <button className="btn btn-secondary" onClick={()=>{resetWizard();setWizardOpen(false)}}>Close</button>
+                      <button className="btn btn-accent" onClick={()=>{resetWizard()}}><Plus size={14}/> Add Another Class</button>
                     </div>
                   </motion.div>
                 )}
@@ -619,33 +581,22 @@ export default function Classes() {
         )}
       </AnimatePresence>
 
-      {/* ── Class list ── */}
       <div style={{position:'relative',marginBottom:16,maxWidth:360}}>
-        <Search size={14} style={{position:'absolute',left:10,top:'50%',
-          transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}}/>
-        <input style={{width:'100%',padding:'9px 12px 9px 34px',
-          background:'var(--surface)',border:'1px solid var(--border)',
+        <Search size={14} style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}}/>
+        <input style={{width:'100%',padding:'9px 12px 9px 34px',background:'var(--surface)',border:'1px solid var(--border)',
           borderRadius:'var(--r-lg)',fontSize:13,color:'var(--text)',outline:'none'}}
-          placeholder="Search classes…"
-          value={classSearch} onChange={e=>setClassSearch(e.target.value)}/>
+          placeholder="Search classes…" value={classSearch} onChange={e=>setClassSearch(e.target.value)}/>
       </div>
 
       {loading ? (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:16}}>
-          {[1,2,3].map(i=>(
-            <div key={i} className="skeleton-block" style={{height:160,
-              borderRadius:'var(--r-xl)'}}/>
-          ))}
+          {[1,2,3].map(i=>(<div key={i} className="skeleton-block" style={{height:160,borderRadius:'var(--r-xl)'}}/>))}
         </div>
       ) : filteredClasses.length === 0 ? (
         <div className="exam-empty">
           <div className="teacher-empty-icon-wrap"><School size={26} color="var(--blue-400)"/></div>
-          <h3 className="exam-empty-title">
-            {classSearch?'No matching classes':'No classes yet'}
-          </h3>
-          <p className="exam-empty-body">
-            {classSearch?'Try a different search':'Create your first class to get started'}
-          </p>
+          <h3 className="exam-empty-title">{classSearch?'No matching classes':'No classes yet'}</h3>
+          <p className="exam-empty-body">{classSearch?'Try a different search':'Create your first class to get started'}</p>
           {!classSearch&&<button className="btn btn-accent" onClick={openCreate}><Plus size={14}/> New Class</button>}
         </div>
       ) : (
@@ -654,73 +605,49 @@ export default function Classes() {
             const clsAllocs  = allocs[cls.id]||[]
             const assigned   = clsAllocs.filter(a=>a.status==='assigned').length
             const pending    = clsAllocs.filter(a=>a.status==='pending').length
-            const hasPending = pending > 0
             return (
-              <motion.div key={cls.id} className="class-card"
-                initial={{opacity:0,y:16}} animate={{opacity:1,y:0}}
-                transition={{delay:i*.04}}>
+              <motion.div key={cls.id} className="class-card" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:i*.04}}>
                 <div className="class-card-top">
-                  <div className="class-avatar">
-                    {cls.name.slice(0,2).toUpperCase()}
-                  </div>
+                  <div className="class-avatar">{cls.name.slice(0,2).toUpperCase()}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div className="class-name">{cls.name}</div>
                     <div className="class-meta">
-                      Grade {cls.grade_level}
+                      {gradeLabel(cls.grade_level)}
                       {cls.stream&&<> · {cls.stream}</>}
                       {cls.capacity&&<> · {cls.capacity} students</>}
                     </div>
                   </div>
-                  {hasPending&&(
-                    <span className="class-pending-badge">
-                      <AlertCircle size={11}/> {pending} pending
-                    </span>
-                  )}
+                  {pending > 0 && (<span className="class-pending-badge"><AlertCircle size={11}/> {pending} pending</span>)}
                 </div>
 
-                {/* Allocation pills */}
                 {clsAllocs.length>0&&(
                   <div className="class-alloc-pills">
                     {clsAllocs.slice(0,6).map(a=>(
-                      <span key={a.id}
-                        className={`class-alloc-pill${a.status==='pending'?' pending':''}`}
+                      <span key={a.id} className={`class-alloc-pill${a.status==='pending'?' pending':''}`}
                         style={a.status==='assigned'
-                          ?{background:`${a.subject_color||'#38bdf8'}18`,
-                            color:a.subject_color||'#38bdf8',
-                            borderColor:`${a.subject_color||'#38bdf8'}44`}:{}}>
-                        {a.subject_name}
-                        {a.status==='pending'&&' ⏳'}
+                          ?{background:`${a.subject_color||'#38bdf8'}18`,color:a.subject_color||'#38bdf8',borderColor:`${a.subject_color||'#38bdf8'}44`}:{}}>
+                        {a.subject_name}{a.status==='pending'&&' ⏳'}
                       </span>
                     ))}
-                    {clsAllocs.length>6&&(
-                      <span className="class-alloc-pill" style={{color:'var(--muted)'}}>
-                        +{clsAllocs.length-6} more
-                      </span>
-                    )}
+                    {clsAllocs.length>6&&(<span className="class-alloc-pill" style={{color:'var(--muted)'}}>+{clsAllocs.length-6} more</span>)}
                   </div>
                 )}
-
                 {clsAllocs.length===0&&(
-                  <div style={{fontSize:12,color:'var(--muted)',fontStyle:'italic',
-                    padding:'8px 0'}}>No subjects assigned yet</div>
+                  <div style={{fontSize:12,color:'var(--muted)',fontStyle:'italic',padding:'8px 0'}}>No subjects assigned yet</div>
                 )}
 
-                <div style={{marginTop:12,fontSize:12,color:'var(--muted)',
-                  display:'flex',gap:12}}>
+                <div style={{marginTop:12,fontSize:12,color:'var(--muted)',display:'flex',gap:12}}>
                   {assigned>0&&<span style={{color:'#16a34a'}}>✓ {assigned} assigned</span>}
                   {pending>0 &&<span style={{color:'#f59e0b'}}>⏳ {pending} pending</span>}
                 </div>
 
                 <div className="class-actions">
-                  <button className="btn btn-sm btn-secondary" onClick={()=>openEdit(cls)}>
-                    <Pencil size={13}/> Edit
-                  </button>
+                  <button className="btn btn-sm btn-secondary" onClick={()=>openEdit(cls)}><Pencil size={13}/> Edit</button>
                   <button className="btn btn-sm btn-secondary"
                     onClick={()=>navigate('/teachers', { state: { classId: cls.id, className: cls.name } })}>
                     <Users size={13}/> Assign Teachers
                   </button>
-                  <button className="btn btn-sm delete-btn" style={{marginLeft:'auto'}}
-                    onClick={()=>deleteClass(cls.id)}>
+                  <button className="btn btn-sm delete-btn" style={{marginLeft:'auto'}} onClick={()=>deleteClass(cls.id)}>
                     <Trash2 size={13}/>
                   </button>
                 </div>

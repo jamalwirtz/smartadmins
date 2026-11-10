@@ -11,9 +11,14 @@ Hard Constraints (NEVER violated):
   6. Locked slots never moved or deleted
 
 Soft Constraints (optimised via scoring):
-  - Avoid same subject on consecutive periods
   - Spread subject assignments across the week evenly
-  - Balance teacher load across days
+  - Avoid clustering the same subject on one day
+
+BATCH 2 CHANGE — which subjects a class takes, and who teaches them:
+  1. If the class has subject ALLOCATIONS (Classes page), those decide the
+     subjects, and an allocated teacher is used for that subject.
+  2. Otherwise subjects are matched on the level label using levels.norm_level,
+     so "8", "Grade 8" and "grade-8" all match (class names are free text).
 """
 import random
 from collections import defaultdict
@@ -23,8 +28,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from config import get_settings
+from levels import same_level
 from models import (
-    ClassSection, Subject, Teacher, TeacherSubject,
+    ClassAllocation, ClassSection, Subject, Teacher, TeacherSubject,
     TimetableDraft, TimetableSlot,
 )
 
@@ -39,12 +45,7 @@ class SchedulingEngine:
     # ── Public API ───────────────────────────────────────────────────────────
 
     def generate_drafts(self, count: int = 3, seeds: List[int] = None) -> List[TimetableDraft]:
-        # FIX: guarantee exactly `count` drafts are produced even when the
-        # caller passes fewer seeds than count (or none at all) — previously
-        # `seeds[:count]` on a short/empty list silently produced fewer
-        # drafts than requested, which is why "3 drafts" sometimes turned
-        # into 1 or 2. Pad out from DEFAULT_SEEDS, then fall back to random
-        # seeds, until we have exactly `count` unique seeds.
+        # Guarantee exactly `count` drafts even when fewer seeds are supplied.
         count = count or 3
         seeds = list(seeds or [])
         pool = list(self.DEFAULT_SEEDS)
@@ -104,7 +105,6 @@ class SchedulingEngine:
         if slot.is_locked:
             raise HTTPException(409, "Cannot move a locked slot")
 
-        # Check target is free for this class
         conflict_class = (
             self.db.query(TimetableSlot)
             .filter(
@@ -119,7 +119,6 @@ class SchedulingEngine:
         if conflict_class:
             raise HTTPException(409, f"Class already has a lesson on {new_day} P{new_period}")
 
-        # Check teacher is free at target
         if slot.teacher_id:
             conflict_teacher = (
                 self.db.query(TimetableSlot)
@@ -135,7 +134,6 @@ class SchedulingEngine:
             if conflict_teacher:
                 raise HTTPException(409, f"Teacher already assigned on {new_day} P{new_period}")
 
-            # Check teacher availability
             teacher = self.db.get(Teacher, slot.teacher_id)
             if teacher:
                 if new_day in teacher.days_off_list:
@@ -171,7 +169,6 @@ class SchedulingEngine:
         slots = self.db.query(TimetableSlot).filter(TimetableSlot.draft_id == draft_id).all()
         errors = []
 
-        # Teacher double-booking
         t_seen: Dict[Tuple, str] = {}
         for s in slots:
             if not s.teacher_id:
@@ -182,7 +179,6 @@ class SchedulingEngine:
             else:
                 t_seen[key] = s.id
 
-        # Class double-booking
         c_seen: Dict[Tuple, str] = {}
         for s in slots:
             key = (s.class_id, s.day, s.period)
@@ -191,7 +187,6 @@ class SchedulingEngine:
             else:
                 c_seen[key] = s.id
 
-        # Availability
         teachers = {t.id: t for t in self.db.query(Teacher).all()}
         for s in slots:
             if not s.teacher_id:
@@ -219,7 +214,9 @@ class SchedulingEngine:
         periods = list(range(1, self.cfg.PERIODS_PER_DAY + 1))
 
         teachers = self.db.query(Teacher).all()
+        teachers_by_id = {t.id: t for t in teachers}
         subjects = self.db.query(Subject).all()
+        subjects_by_id = {s.id: s for s in subjects}
         classes = self.db.query(ClassSection).all()
         if class_ids:
             classes = [c for c in classes if c.id in class_ids]
@@ -229,7 +226,11 @@ class SchedulingEngine:
         for ts in self.db.query(TeacherSubject).all():
             teacher_subjects[ts.teacher_id].add(ts.subject_id)
 
-        # Pre-load occupied slots from locked entries already saved
+        # class_id -> {subject_id: allocated teacher_id or None}
+        allocations: Dict[str, Dict[str, Optional[str]]] = defaultdict(dict)
+        for a in self.db.query(ClassAllocation).all():
+            allocations[a.class_id][a.subject_id] = a.teacher_id
+
         teacher_occupied: Set[Tuple] = set()
         class_occupied: Set[Tuple] = set()
         teacher_weekly: Dict[str, int] = defaultdict(int)
@@ -251,29 +252,29 @@ class SchedulingEngine:
         new_slots: List[TimetableSlot] = []
 
         for cls in classes:
-            # If the class has a curriculum set, only match subjects tagged
-            # with that same curriculum OR subjects with no curriculum tag
-            # at all (so manually-added, curriculum-agnostic subjects still
-            # work). Classes with no curriculum set keep the old
-            # grade_level-only behavior.
-            if cls.education_system_id:
+            # 1) Explicit allocations win. 2) Otherwise match the level label
+            #    (flexible) and the curriculum.
+            if cls.id in allocations:
+                grade_subjects = [subjects_by_id[sid] for sid in allocations[cls.id] if sid in subjects_by_id]
+            else:
                 grade_subjects = [
                     s for s in subjects
-                    if s.grade_level == cls.grade_level
-                    and (s.education_system_id == cls.education_system_id or not s.education_system_id)
+                    if same_level(s.grade_level, cls.grade_level)
+                    and (not cls.education_system_id or not s.education_system_id
+                         or s.education_system_id == cls.education_system_id)
                 ]
-            else:
-                grade_subjects = [s for s in subjects if s.grade_level == cls.grade_level]
 
-            # Build the list of (subject, candidate_teachers) to place
             assignments: List[Tuple[Subject, List[Teacher]]] = []
             for subj in grade_subjects:
-                eligible = [t for t in teachers if subj.id in teacher_subjects[t.id]]
+                allocated_tid = allocations.get(cls.id, {}).get(subj.id)
+                if allocated_tid and allocated_tid in teachers_by_id:
+                    eligible = [teachers_by_id[allocated_tid]]   # the chosen teacher
+                else:
+                    eligible = [t for t in teachers if subj.id in teacher_subjects[t.id]]
                 for _ in range(subj.weekly_periods):
-                    assignments.append((subj, list(eligible)))  # copy list to avoid mutation
+                    assignments.append((subj, list(eligible)))
             rng.shuffle(assignments)
 
-            # Available (day, period) pool for this class — use a set for O(1) removal
             pool_set: Set[Tuple[str, int]] = {
                 (d, p) for d in days for p in periods
                 if (cls.id, d, p) not in class_occupied
@@ -282,27 +283,21 @@ class SchedulingEngine:
             subject_day_count: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
             for subj, eligible_teachers in assignments:
-                # Score slots: penalise clustering same subject on same day
-                # Capture subj.id in closure explicitly to avoid late-binding bug
                 subj_id = subj.id
 
                 def score(dp: Tuple[str, int], _sid: str = subj_id) -> float:
                     d, _ = dp
                     return subject_day_count[_sid][d] * 10 + rng.random()
 
-                # Only score slots that are actually still free for this class
                 available = sorted(
                     [dp for dp in pool_set if (cls.id, dp[0], dp[1]) not in class_occupied],
                     key=score,
                 )
 
-                placed = False
                 for day, period in available:
-                    # Double-check class slot still free
                     if (cls.id, day, period) in class_occupied:
                         continue
 
-                    # Find a valid teacher
                     rng.shuffle(eligible_teachers)
                     chosen: Optional[Teacher] = None
                     for t in eligible_teachers:
@@ -318,9 +313,9 @@ class SchedulingEngine:
                         break
 
                     if chosen is None:
-                        continue  # no teacher free this slot — try next slot
+                        continue
 
-                    slot = TimetableSlot(
+                    new_slots.append(TimetableSlot(
                         draft_id=draft.id,
                         class_id=cls.id,
                         teacher_id=chosen.id,
@@ -328,15 +323,13 @@ class SchedulingEngine:
                         day=day,
                         period=period,
                         is_locked=False,
-                    )
-                    new_slots.append(slot)
+                    ))
                     teacher_occupied.add((chosen.id, day, period))
                     class_occupied.add((cls.id, day, period))
                     teacher_weekly[chosen.id] += 1
                     subject_day_count[subj.id][day] += 1
                     pool_set.discard((day, period))
-                    placed = True
                     break
-                # If placed is False, we soft-skip (no eligible slot found)
+                # No teacher/slot found → soft-skip
 
         self.db.bulk_save_objects(new_slots)
